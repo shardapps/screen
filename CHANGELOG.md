@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1 — slider polish
+
+- Remove stale thumb trails and native trackbar fragments during dragging with complete buffered slider frames.
+- Replace the dotted focus rectangle with a small solid ring around the thumb when using the keyboard; retain native keyboard and accessibility support.
+- Align the rounded flyout region with its actual bounds.
+
 ## 0.2.0 — compact controls and reliable dimming
 
 - Replace the large window with a 330 × 136 flyout anchored above the bottom-right taskbar.
