@@ -58,6 +58,7 @@ jobs:
       - name: Assemble portable preview
         run: |
           $portable = 'build/portable-${{ matrix.arch }}'
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
           New-Item -ItemType Directory -Path $portable -Force | Out-Null
           Copy-Item build/${{ matrix.arch }}/Release/Screen.exe,LICENSE,README.md -Destination $portable
           foreach ($item in @('docs','PRIVACY.md','SECURITY.md','CONTRIBUTING.md','CODE_OF_CONDUCT.md','CHANGELOG.md')) {
