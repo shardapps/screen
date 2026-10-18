@@ -25,7 +25,8 @@ private:
     struct Surface {
         HWND window{};
         std::wstring device;
-        double current = 0, from = 0, target = 0;
+        SmoothValue alpha;
+        BYTE applied = 0;
     };
     HWND owner_{}, control_{};
     std::thread thread_;
@@ -33,10 +34,17 @@ private:
     std::atomic<bool> pending_{false};
     Settings desired_, active_;
     bool persist_ = false, rebuild_ = false;
-    bool sessionLocked_ = false;
+    bool sessionLocked_ = false, motionAllowed_ = true;
+    bool fading_ = false, coveragePending_ = false, auditing_ = false;
+    HWINEVENTHOOK foregroundHook_{}, windowHook_{}, desktopHook_{}, locationHook_{};
+    static thread_local OverlayEngine* observer_;
     std::vector<Surface> surfaces_;
+    std::vector<HWND> higherBandWindows_;
     std::chrono::steady_clock::time_point start_;
     static LRESULT CALLBACK procedure(HWND, UINT, WPARAM, LPARAM);
+    static void CALLBACK windowEvent(HWINEVENTHOOK, DWORD, HWND, LONG, LONG, DWORD, DWORD);
+    void queueCoverage();
+    void ensureCoverage();
     void rebuild();
     void consume();
     void transition();

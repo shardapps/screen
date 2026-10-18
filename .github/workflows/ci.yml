@@ -69,7 +69,7 @@ jobs:
         run: ./scripts/installer.ps1 -Architecture ${{ matrix.arch }} -Executable build/${{ matrix.arch }}/Release/Screen.exe
       - name: Test install, launch, upgrade and uninstall
         if: matrix.arch == 'x64'
-        run: ./scripts/test-installer.ps1 -Installer dist/Screen-Setup-0.1.0-x64.exe
+        run: ./scripts/test-installer.ps1 -Installer dist/Screen-Setup-0.2.0-x64.exe
       - name: Add download instructions and checksums
         run: |
           Copy-Item packaging/INSTALL.txt -Destination dist/INSTALL.txt

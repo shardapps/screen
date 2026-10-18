@@ -20,7 +20,7 @@ Software brightness control across your desktop, with smooth fades, per-monitor 
 
 Screen by **Shardapps** places a transparent, click-through black layer over each display. Lowering the brightness slider makes that layer more opaque, reducing the perceived brightness of ordinary desktop apps together. It works independently of a monitor's brightness API and does not change hardware backlight settings.
 
-**Status: developer preview, v0.1.0.** CI produces per-user setup EXEs and portable ZIPs. Unsigned MSIX files are separate packaging-validation artifacts, not normal installers. Microsoft Store publication and certification are pending; there is no Store listing yet.
+**Status: developer preview, v0.2.0.** CI produces per-user setup EXEs and portable ZIPs. Unsigned MSIX files are separate packaging-validation artifacts, not normal installers. Microsoft Store publication and certification are pending; there is no Store listing yet.
 
 ## Built to stay out of your way
 
@@ -28,17 +28,19 @@ Screen by **Shardapps** places a transparent, click-through black layer over eac
 | --- | --- |
 | Native and small | C++20, Win32, and the Windows compositor. No bundled browser or managed runtime. |
 | Multi-monitor dimming | Adjust all displays together or select one display. Monitor geometry refreshes when Windows reports a display change. |
-| Smooth transitions | Time-based, 200 ms eased fades. Animation runs on a separate thread and stops when settled. |
+| Compact flyout | A 330 × 136 panel above the bottom-right taskbar. Open with Alt+S, adjust the slider, then click outside or press Escape. |
+| Smooth transitions | Velocity-preserving fades keep moving through rapid slider updates. Short panel transitions respect Windows' animation preference. |
 | Optional warm tint | Switch the black overlay to a subtle warm color. This changes displayed colors. |
 | Background controls | Close to the system tray; reopen, pause, restore, or quit from its menu. |
-| Keyboard access | Native keyboard controls, brightness shortcuts, pause, and emergency restore. |
-| Recovery by design | Transparent startup, a 15% brightness floor, immediate emergency restore, and automatic overlay cleanup on exit. |
+| Keyboard access | Alt+S opens/hides the panel. Native arrow/page keys adjust its slider; global brightness, pause, and emergency restore shortcuts remain available. |
+| Recovery by design | Transparent startup, an 8% brightness floor, immediate emergency restore, and automatic overlay cleanup on exit. |
+| Coverage repair | Window events and a lightweight active-only order audit repair ordinary windows moving above the dimming layer. |
 | Local and private | No account, telemetry, advertising, network client, or administrator prompt. |
 
 <details>
 <summary>See the actual Windows app</summary>
 
-<img src="docs/assets/screenshot.png" alt="Actual Screen v0.1.0 window on Windows 11, showing brightness, display selection, warm tint, smooth transitions, tray and restore controls" width="380" />
+<img src="docs/assets/screenshot.png" alt="Actual Screen v0.2.0 compact Windows 11 flyout with a brightness slider, percentage and Alt+S shortcut" width="380" />
 
 Paused startup at 150% display scaling. The hero above is an interface illustration.
 
@@ -48,21 +50,22 @@ Paused startup at 150% display scaling. The hero above is an interface illustrat
 
 1. Open a successful [Windows CI run](https://github.com/shardapps/screen/actions/workflows/ci.yml). GitHub requires sign-in to download workflow artifacts.
 2. Download `Screen-preview-x64` for an Intel/AMD PC, or `Screen-preview-arm64` for Windows on Arm, and extract the artifact ZIP.
-3. Run the **`Screen-Setup-0.1.0-x64.exe`** (or ARM64 setup) inside. It installs for your current user, adds a Start menu shortcut, and supports uninstall through **Settings → Apps**. Alternatively, extract the portable ZIP completely and run `Screen.exe`. These previews are unsigned; Windows may show an unknown publisher/SmartScreen warning, and managed policies may block them. Review the source/build before running them.
-4. Choose a display and select **Enable dimming**, or move the slider. Screen always starts paused; your saved brightness and preferences are retained.
+3. Quit any older Screen copy from its tray menu, then run **`Screen-Setup-0.2.0-x64.exe`** (or ARM64 setup). It updates the existing per-user installation, adds a Start menu shortcut, and supports uninstall through **Settings → Apps**. Alternatively, extract the portable ZIP completely and run `Screen.exe`. These previews are unsigned; Windows may show an unknown publisher/SmartScreen warning, and managed policies may block them. Review the source/build before running them.
+4. Move the slider to enable dimming. Screen always starts paused; your saved brightness and preferences are retained. Right-click the tray icon or panel for display selection, warm tint, smooth transitions, pause, restore and quit.
 
-Closing the window keeps Screen in the tray. Choose **Quit** to stop the app and restore the desktop. `Screen.exe --background` starts in the tray, paused. Automatic startup is not enabled by this preview.
+Alt+S toggles the flyout. Click outside it or press Escape to dismiss it while dimming continues. Choose **Quit** in the tray menu to stop Screen and restore the desktop. `Screen.exe --background` starts in the tray, paused. Automatic startup is not enabled by this preview.
 
 **MSIX install error?** `Screen-msix-validation-*` artifacts contain unsigned packages for packaging development. Windows App Installer does not accept them as normal trusted installers. Use the setup EXE or portable app above; see [installation help](docs/INSTALLATION.md).
 
 | Shortcut | Action |
 | --- | --- |
+| `Alt + S` | Open / hide the brightness flyout (`Ctrl + Alt + S` fallback if reserved) |
 | `Ctrl + Alt + D` | Pause / enable dimming |
 | `Ctrl + Alt + ↓` | Dim all displays by 5 percentage points |
 | `Ctrl + Alt + ↑` | Brighten all displays by 5 percentage points |
 | `Ctrl + Alt + Shift + F12` | Immediately restore all displays to 100% and pause |
 
-Other software can reserve a shortcut. Screen reports registration conflicts in its window; Restore and the tray menu remain available. Selecting **All displays** and moving the slider replaces per-display overrides.
+Other software can reserve a shortcut. The flyout shows the opening shortcut that registered successfully; the tray icon always remains an access path. Selecting **Display → All displays** in the menu and moving the slider replaces per-display overrides.
 
 ## How it works
 
@@ -76,20 +79,19 @@ flowchart LR
     G[Emergency restore] --> C
 ```
 
-The overlay is a standard Windows layered window with transparent input and no activation. Windows routes clicks to the apps underneath. A short timer updates opacity during a fade; there is no continuous animation loop, screen capture, driver, or polling service. See [architecture and safety](docs/ARCHITECTURE.md).
+The overlay is a standard Windows layered window with transparent input and no activation. Windows routes clicks to the apps underneath. Opacity changes run only during a fade. Out-of-process window notifications repair stacking promptly, backed by a small order check four times per second only while dimming is active. Paused and 100% brightness disable that audit. There is no screen capture, driver, or busy loop. See [architecture and safety](docs/ARCHITECTURE.md).
 
 ### A measured starting point
 
-One local x64 Release sample on Windows 11 build 26200, with one connected display and Screen paused in the tray:
+Local x64 development samples on Windows 11 build 26200, with one connected display:
 
-| Measurement | Result |
-| --- | ---: |
-| Executable | 389 KiB |
-| Process working set | 13.26 MiB |
-| Private committed memory | 2.12 MiB |
-| Process CPU time over 10 seconds | 0 ms measured |
+| Measurement | Paused | Active overlay at 99% |
+| --- | ---: | ---: |
+| Process working set | 12.96 MiB | 13.09 MiB |
+| Private committed memory | 2.13 MiB | 2.10 MiB |
+| Process CPU time over 10 seconds | 0 ms measured | 0 ms measured |
 
-This is one measurement, **not a memory or CPU guarantee**. It excludes Windows compositor/GPU memory, and does not measure an active dimming surface. Resolution, display count, drivers, Windows version, and other activity affect results. [Reproduce the benchmark](docs/PERFORMANCE.md).
+The development executable is about **405 KiB**. These are individual measurements, **not memory or CPU guarantees**, and exclude compositor/GPU memory. Resolution, display count, drivers, Windows version, and other activity affect results. [Measurement details](docs/PERFORMANCE.md).
 
 ## Compatibility and honest limits
 

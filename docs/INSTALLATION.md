@@ -2,7 +2,7 @@
 
 ## Normal setup
 
-Download the `Screen-preview-x64` CI artifact for Intel/AMD Windows, or `Screen-preview-arm64` for Windows on Arm. Extract it and open `Screen-Setup-0.1.0-x64.exe` or its ARM64 equivalent.
+Download the `Screen-preview-x64` CI artifact for Intel/AMD Windows, or `Screen-preview-arm64` for Windows on Arm. Extract it and open `Screen-Setup-0.2.0-x64.exe` or its ARM64 equivalent.
 
 Setup installs under `%LOCALAPPDATA%\Programs\Shardapps\Screen`, creates **Shardapps → Screen by Shardapps** in the Start menu, and registers a per-user uninstall entry. A desktop shortcut is optional. It needs no administrator rights and does not add certificates or change trust settings. Close Screen using its tray menu before reinstalling, upgrading, or uninstalling it.
 
@@ -12,7 +12,7 @@ This remains an unsigned developer preview. Windows may show SmartScreen or unkn
 
 Extract `Screen-portable-x64.zip` or the ARM64 ZIP completely into a folder, then run `Screen.exe`. A portable ZIP is not an installer and creates no Start menu or uninstall entry.
 
-Both forms start paused. Enable dimming or move the slider to apply it. Closing the window keeps Screen in the tray; **Quit** stops it. Emergency restore is **Ctrl + Alt + Shift + F12**.
+Both forms start paused. Move the slider to apply dimming. **Alt+S** opens/hides the compact panel above the bottom-right taskbar; **Ctrl+Alt+S** is the fallback when Alt+S is reserved. Click outside or press Escape to dismiss it. Right-click the tray icon or panel for display/tint settings, pause, restore and **Quit**. Emergency restore is **Ctrl + Alt + Shift + F12**.
 
 ## Why the MSIX fails to install
 

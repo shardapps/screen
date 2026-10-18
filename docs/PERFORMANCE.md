@@ -1,15 +1,16 @@
 # Performance measurements
 
-## Baseline
+## v0.2.0 development baseline
 
-Measured October 18, 2026: Release x64, MSVC 19.51, Windows 11 build 26200, one connected display, paused in the tray, after a two-second warmup, over a ten-second idle sample.
+Measured October 18, 2026: Release x64, MSVC 19.51, Windows 11 build 26200, one connected display, after a two-second warmup, over ten-second samples. The active sample applies a full-screen overlay at 99% brightness; deeper dimming has the same surface dimensions.
 
-| Metric | Observed |
-| --- | ---: |
-| Screen.exe | 398,336 bytes (389 KiB) |
-| Working set | 13.26 MiB |
-| Private committed memory | 2.12 MiB |
-| Process CPU time delta | 0.0 ms |
+| Metric | Paused tray | Active overlay |
+| --- | ---: | ---: |
+| Working set | 12.96 MiB | 13.09 MiB |
+| Private committed memory | 2.13 MiB | 2.10 MiB |
+| Process CPU time delta | 0.0 ms | 0.0 ms |
+
+The development executable was 414,720 bytes (405 KiB). These are separate process samples; allocator and OS behavior can make one private-memory sample slightly lower than another.
 
 This sample is illustrative, not a performance SLA. Working set includes resident shared pages; private commit is a different measurement. Neither includes all memory charged to DWM or the GPU. An active overlay, additional displays, higher resolutions, HDR, driver changes, UI activity, and OS differences can change results. A CPU time delta below the accounting granularity does not prove literally zero work.
 
@@ -31,7 +32,7 @@ Targets to investigate, not claimed universal results:
 
 - Keep the portable Release executable below 1 MiB without sacrificing hardening or accessibility.
 - Keep application idle CPU near the measurement floor after a transition settles.
-- Avoid periodic timers, busy loops, timer-resolution changes, and permanent per-frame screen copies.
+- Avoid busy loops, timer-resolution changes, and permanent per-frame screen copies. Keep the active-only 4 Hz coverage audit small; it is needed for silent order changes and must stop when paused/at 100%.
 - Investigate a reproducible regression above 20% in comparable private commit or transition CPU before merging.
 
 Report memory and frame cadence under active multi-monitor dimming before Store release. The local paused baseline alone does not establish those properties.

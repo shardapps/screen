@@ -11,7 +11,7 @@ Developer preview builds are not a substitute for this release gate. Record the 
 
 ## Windows behavior
 
-- [ ] Start paused, move brightness slider, verify 15% floor, warm tint, smooth on/off, and restore at every setting.
+- [ ] Start paused, move brightness slider, verify 8% floor, warm tint, smooth on/off, and restore at every setting.
 - [ ] Verify click-through input and keyboard focus in browsers, editors, video apps, and borderless windows.
 - [ ] Test real shortcut delivery, intentional conflicts, tray activation by mouse/keyboard, close-to-tray, explicit quit, and a second launch.
 - [ ] Test Explorer restart, normal shutdown, forced termination, and failed settings writes.

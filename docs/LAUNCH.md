@@ -16,7 +16,7 @@ Screen adds a click-through overlay across ordinary desktop apps, reducing perce
 
 Built with native C++ and Windows APIs, Screen has no bundled browser runtime, account, advertising, or telemetry. A dedicated overlay thread animates brightness changes and stops its animation timer when settled. Keep it in the system tray and return to your work.
 
-Features include per-monitor dimming, smooth 200 ms fades, optional warm tint, global brightness and pause shortcuts, local preferences, transparent startup, a brightness floor, and immediate emergency restore.
+Features include a compact taskbar flyout opened with Alt+S, per-monitor dimming, velocity-preserving fades, optional warm tint, global brightness and pause shortcuts, local preferences, transparent startup, an 8% brightness floor, coverage repair, and immediate emergency restore.
 
 Screen is software dimming. It does not change hardware backlight brightness, guarantee battery savings, or provide a medical benefit. Protected video, exclusive fullscreen apps, HDR, remote sessions, and Windows secure screens have limitations. Read the compatibility notes before use.
 
