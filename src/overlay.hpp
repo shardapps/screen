@@ -1,5 +1,6 @@
 #pragma once
 #include "core.hpp"
+#include "desktop.hpp"
 #include <windows.h>
 #include <atomic>
 #include <chrono>
@@ -10,12 +11,13 @@
 namespace screen {
 inline constexpr UINT overlayFailure = WM_APP + 10;
 inline constexpr UINT settingsFailure = WM_APP + 11;
+inline constexpr UINT coverageChanged = WM_APP + 12;
 struct Monitor { std::wstring device; RECT bounds; bool primary; };
 std::vector<Monitor> enumerateMonitors();
 
 class OverlayEngine {
 public:
-    explicit OverlayEngine(HWND owner);
+    explicit OverlayEngine(HWND owner, bool overlayOnly = false);
     ~OverlayEngine();
     OverlayEngine(const OverlayEngine&) = delete;
     OverlayEngine& operator=(const OverlayEngine&) = delete;
@@ -36,6 +38,10 @@ private:
     bool persist_ = false, rebuild_ = false;
     bool sessionLocked_ = false, motionAllowed_ = true;
     bool fading_ = false, coveragePending_ = false, auditing_ = false;
+    bool overlayOnly_ = false, desktopMode_ = false, desktopBlocked_ = false;
+    int reportedMode_ = -1;
+    DesktopDimmer desktop_;
+    SmoothValue desktopAlpha_;
     HWINEVENTHOOK foregroundHook_{}, windowHook_{}, desktopHook_{}, locationHook_{};
     static thread_local OverlayEngine* observer_;
     std::vector<Surface> surfaces_;

@@ -21,6 +21,7 @@ struct App {
     HICON icon{};
     UINT dpi = 96, taskbarCreated = 0;
     bool trayPresent = false, menuActive = false, animating = false, opening = false, placing = false;
+    bool overlayOnly = false, desktopCoverage = true;
     double panelAlpha = 255, fromAlpha = 255, toAlpha = 255;
     RECT destination{};
     std::chrono::steady_clock::time_point animationStart;
@@ -105,7 +106,8 @@ struct App {
         std::wstring displayName = L"All displays";
         for (size_t i = 0; i < displays.size(); ++i)
             if (displays[i].device == selected) displayName = L"Display " + std::to_wstring(i + 1);
-        const auto summary = statusText.empty() ? (settings.paused ? L"Paused · " : L"") + displayName : statusText;
+        const auto summary = statusText.empty() ? (settings.paused ? L"Paused · " : L"") + displayName +
+            (settings.paused ? L"" : desktopCoverage ? L" · Desktop" : L" · Overlay") : statusText;
         SetWindowTextW(footer, summary.c_str());
         SetWindowTextW(shortcut, shortcutText.c_str());
         if (trayPresent && !tracking) {
@@ -329,7 +331,7 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
         app->taskbarCreated = RegisterWindowMessageW(L"TaskbarCreated");
         app->icon = static_cast<HICON>(LoadImageW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(1), IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_SHARED));
         SendMessageW(window, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(app->icon));
-        app->engine = std::make_unique<screen::OverlayEngine>(window);
+        app->engine = std::make_unique<screen::OverlayEngine>(window, app->overlayOnly);
         if (!app->engine->healthy()) return -1;
         app->engine->submit(app->settings, false, true); app->addTray();
         constexpr UINT mods = MOD_CONTROL | MOD_ALT | MOD_NOREPEAT;
@@ -403,6 +405,8 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
         app->settings.paused = true; app->statusText = L"Restored · try dimming again"; app->sync(); app->show(); return 0;
     case screen::settingsFailure:
         app->statusText = L"Preferences could not be saved"; app->sync(); return 0;
+    case screen::coverageChanged:
+        app->desktopCoverage = wParam != 0; app->sync(); return 0;
     case WM_ERASEBKGND: return 1;
     case WM_PAINT: app->paint(); return 0;
     case WM_CTLCOLORSTATIC:
@@ -422,7 +426,7 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
     return DefWindowProcW(window, message, wParam, lParam);
 }
 }
-int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR commandLine, int) {
+int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     const auto mutex = CreateMutexW(nullptr, FALSE, L"Local\\Shardapps.Screen.Instance");
     if (!mutex) return 1;
@@ -432,6 +436,15 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR commandLine, int) {
     }
     INITCOMMONCONTROLSEX controls{sizeof(controls), ICC_BAR_CLASSES | ICC_STANDARD_CLASSES}; InitCommonControlsEx(&controls);
     App app;
+    bool background = false;
+    int argumentCount = 0;
+    if (auto arguments = CommandLineToArgvW(GetCommandLineW(), &argumentCount)) {
+        for (int index = 1; index < argumentCount; ++index) {
+            if (std::wstring_view(arguments[index]) == L"--background") background = true;
+            if (std::wstring_view(arguments[index]) == L"--overlay") app.overlayOnly = true;
+        }
+        LocalFree(arguments);
+    }
     WNDCLASSEXW type{sizeof(type)}; type.hInstance = instance; type.lpfnWndProc = windowProcedure;
     type.lpszClassName = windowClass; type.hCursor = LoadCursorW(nullptr, IDC_ARROW); type.style = CS_DROPSHADOW;
     type.hIcon = LoadIconW(instance, MAKEINTRESOURCEW(1));
@@ -442,7 +455,6 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR commandLine, int) {
         windowClass, L"Screen by Shardapps", WS_POPUP | WS_CLIPCHILDREN,
         work.right - width - 12, work.bottom - height - 12, width, height, nullptr, nullptr, instance, &app);
     if (!window) { CloseHandle(mutex); return 1; }
-    const bool background = commandLine && std::wstring(commandLine) == L"--background";
     if (!background || !app.trayPresent) app.show();
     MSG message{}; int result;
     while ((result = static_cast<int>(GetMessageW(&message, nullptr, 0, 0))) > 0) {

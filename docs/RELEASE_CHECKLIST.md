@@ -4,7 +4,7 @@ Developer preview builds are not a substitute for this release gate. Record the 
 
 ## Automated
 
-- [ ] x64/ARM64 compile, x64 core/native smoke tests, Linux sanitizer tests, and CodeQL are green.
+- [ ] x64/ARM64 compile, x64 core/overlay/desktop-effect tests, Linux sanitizer tests, and CodeQL are green. Record any session where desktop-effect tests skipped.
 - [ ] Both MSIX architectures pass MakeAppx validation and Windows App Certification Kit.
 - [ ] Executable, resource, CMake project, and MSIX versions agree; release notes are accurate.
 - [ ] No signing material, credentials, private machine paths, or unsupported performance claims are published.
@@ -19,6 +19,7 @@ Developer preview builds are not a substitute for this release gate. Record the 
 - [ ] Test at least two displays with different scaling and negative desktop coordinates; verify independent settings and All displays reset.
 - [ ] Test physical x64 and ARM64 machines; record GPU/driver and display topology.
 - [ ] Verify HDR, protected video, exclusive fullscreen, remote desktop and other topmost apps. Document bypasses clearly.
+- [ ] Verify full-screen video with uniform All displays levels; check Desktop/Overlay reporting and fallback when another accessibility color client is active. Check both renderer modes on physical multi-monitor systems.
 - [ ] Confirm UAC/secure desktop/sign-in remain outside the overlay's scope.
 
 ## Accessibility and performance

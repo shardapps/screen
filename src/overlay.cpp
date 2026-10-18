@@ -7,6 +7,7 @@
 namespace screen {
 namespace {
 constexpr UINT updateMessage = WM_APP + 1;
+constexpr UINT fallbackMessage = WM_APP + 2;
 constexpr wchar_t controlClass[] = L"Shardapps.Screen.Engine";
 constexpr wchar_t surfaceClass[] = L"Shardapps.Screen.Overlay";
 LRESULT CALLBACK surfaceProcedure(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -39,7 +40,7 @@ std::vector<Monitor> enumerateMonitors() {
     return monitors;
 }
 thread_local OverlayEngine* OverlayEngine::observer_ = nullptr;
-OverlayEngine::OverlayEngine(HWND owner) : owner_(owner) {
+OverlayEngine::OverlayEngine(HWND owner, bool overlayOnly) : owner_(owner), overlayOnly_(overlayOnly) {
     std::promise<HWND> ready;
     auto future = ready.get_future();
     thread_ = std::thread([this, promise = std::move(ready)]() mutable {
@@ -74,6 +75,7 @@ OverlayEngine::OverlayEngine(HWND owner) : owner_(owner) {
             DispatchMessageW(&message);
         }
         for (auto hook : {foregroundHook_, windowHook_, desktopHook_, locationHook_}) if (hook) UnhookWinEvent(hook);
+        desktop_.reset();
         observer_ = nullptr;
         WTSUnRegisterSessionNotification(window);
     });
@@ -96,6 +98,7 @@ void OverlayEngine::submit(const Settings& settings, bool persist, bool rebuildR
 void OverlayEngine::reportFailure() {
     // Fail open: remove every dimming surface if the overlay cannot be maintained safely.
     active_.paused = true;
+    desktop_.reset(); desktopAlpha_ = {};
     {
         const std::lock_guard lock(mutex_);
         desired_.paused = true;
@@ -134,6 +137,7 @@ void OverlayEngine::consume() {
     {
         const std::lock_guard lock(mutex_);
         active_ = desired_;
+        desktopBlocked_ = false; // Retry the desktop API on a new user adjustment.
         persist = persist_;
         refresh = rebuild_;
         persist_ = rebuild_ = false;
@@ -155,9 +159,30 @@ void OverlayEngine::transition() {
     motionAllowed_ = allowed != FALSE;
     if (fading_ && active_.smooth && motionAllowed_) tick(); // Integrate time before changing a moving target.
     start_ = std::chrono::steady_clock::now();
+    const int level = surfaces_.empty() ? 100 : active_.forMonitor(surfaces_.front().device);
+    const bool uniform = !surfaces_.empty() && std::all_of(surfaces_.begin(), surfaces_.end(),
+        [&](const auto& surface) { return active_.forMonitor(surface.device) == level; });
+    bool useDesktop = !overlayOnly_ && uniform && !desktopBlocked_;
+    if (useDesktop && opacity(level, active_.paused || sessionLocked_) && !desktop_.prepare()) {
+        desktopBlocked_ = true; useDesktop = false;
+    }
+    if (useDesktop != desktopMode_) {
+        desktop_.reset(); desktopAlpha_ = {};
+        for (auto& surface : surfaces_) {
+            surface.alpha = {}; surface.applied = 0;
+            SetLayeredWindowAttributes(surface.window, 0, 0, LWA_ALPHA);
+            ShowWindow(surface.window, SW_HIDE);
+        }
+        KillTimer(control_, 1); fading_ = false;
+        desktopMode_ = useDesktop;
+    }
+    const int mode = desktopMode_ ? 1 : 0;
+    if (reportedMode_ != mode) { reportedMode_ = mode; PostMessageW(owner_, coverageChanged, mode, 0); }
     bool needsAudit = false;
+    desktopAlpha_.target = desktopMode_ ? opacity(level, active_.paused || sessionLocked_) : 0;
+    needsAudit = desktopAlpha_.target > 0;
     for (auto& surface : surfaces_) {
-        surface.alpha.target = opacity(active_.forMonitor(surface.device), active_.paused || sessionLocked_);
+        surface.alpha.target = desktopMode_ ? 0 : opacity(active_.forMonitor(surface.device), active_.paused || sessionLocked_);
         needsAudit = needsAudit || surface.alpha.target > 0;
         if (surface.alpha.target > 0 || surface.alpha.value > 0) ShowWindow(surface.window, SW_SHOWNOACTIVATE);
     }
@@ -176,6 +201,16 @@ void OverlayEngine::tick() {
     const auto elapsed = std::chrono::duration<double>(now - start_).count();
     start_ = now;
     bool animating = false;
+    if (desktopMode_ && !desktopBlocked_) {
+        if (active_.smooth && motionAllowed_) animating = desktopAlpha_.advance(elapsed);
+        else desktopAlpha_.snap();
+        if (!desktop_.apply(static_cast<BYTE>(std::lround(desktopAlpha_.value)), active_.warm)) {
+            desktopBlocked_ = true;
+            KillTimer(control_, 1); fading_ = false;
+            PostMessageW(control_, fallbackMessage, 0, 0);
+            return;
+        }
+    }
     for (auto& surface : surfaces_) {
         if (active_.smooth && motionAllowed_) animating = surface.alpha.advance(elapsed) || animating;
         else surface.alpha.snap();
@@ -215,6 +250,13 @@ void OverlayEngine::queueCoverage() {
 }
 void OverlayEngine::ensureCoverage() {
     if (sessionLocked_ || active_.paused) return;
+    if (desktopMode_) {
+        if (!desktopBlocked_ && !desktop_.intact()) {
+            desktop_.reset(); desktopBlocked_ = true;
+            PostMessageW(control_, fallbackMessage, 0, 0);
+        }
+        return;
+    }
     bool surfacesRaised = false;
     for (const auto& surface : surfaces_) {
         if (!IsWindow(surface.window)) { rebuild(); transition(); return; }
@@ -275,6 +317,7 @@ LRESULT CALLBACK OverlayEngine::procedure(HWND window, UINT message, WPARAM wPar
     if (!self) return DefWindowProcW(window, message, wParam, lParam);
     switch (message) {
     case updateMessage: self->consume(); return 0;
+    case fallbackMessage: self->transition(); return 0;
     case WM_TIMER:
         if (wParam == 1) self->tick();
         else if (wParam == 2) {
@@ -292,6 +335,7 @@ LRESULT CALLBACK OverlayEngine::procedure(HWND window, UINT message, WPARAM wPar
     case WM_WTSSESSION_CHANGE:
         if (wParam == WTS_SESSION_LOCK) {
             self->sessionLocked_ = true;
+            self->desktop_.reset(); self->desktopAlpha_ = {};
             // Lock transitions must restore immediately, regardless of animation preference.
             for (auto& surface : self->surfaces_) {
                 surface.alpha = {}; surface.applied = 0;
@@ -307,6 +351,7 @@ LRESULT CALLBACK OverlayEngine::procedure(HWND window, UINT message, WPARAM wPar
         }
         return 0;
     case WM_CLOSE:
+        self->desktop_.reset();
         KillTimer(window, 1);
         KillTimer(window, 2);
         KillTimer(window, 3);

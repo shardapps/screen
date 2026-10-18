@@ -17,9 +17,9 @@ For ARM64, pass `-Architecture arm64` and its ARM64 executable. The script requi
 
 ## Use the real Shardapps identity
 
-Reserve an app in the Shardapps Partner Center account. Copy its exact package identity name and publisher certificate subject from Product identity. Do not infer them from the brand name. Run the script with these explicit values and a monotonically increasing four-part Store version whose first component is at least 1 and whose final component is zero, such as `-Version 1.0.0.0`. The default `0.2.1.0` is for developer preview validation, not Store submission. Update the executable/project versions together for the release.
+Reserve an app in the Shardapps Partner Center account. Copy its exact package identity name and publisher certificate subject from Product identity. Do not infer them from the brand name. Run the script with these explicit values and a monotonically increasing four-part Store version whose first component is at least 1 and whose final component is zero, such as `-Version 1.0.0.0`. The default `0.3.0.0` is for developer preview validation, not Store submission. Update the executable/project versions together for the release.
 
-The manifest targets `Windows.Desktop` starting at Windows 11 build 22000. It declares `runFullTrust` for its Win32 entry point, not elevation. Explain the desktop-wide, click-through overlay behavior and lack of driver/kernel access in certification notes.
+The manifest targets `Windows.Desktop` starting at Windows 11 build 22000. It declares `runFullTrust` for its Win32 entry point, not elevation. Explain the full-desktop Magnification color effect, the per-display click-through overlay fallback, restoration behavior, and lack of driver/kernel access in certification notes. Screen does not change zoom or input transforms.
 
 See Microsoft's [manual packaging guidance](https://learn.microsoft.com/en-us/windows/msix/desktop/desktop-to-uwp-manual-conversion) and [Partner Center packaging guidance](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/app-package-requirements). Partner Center requirements can change; review current guidance before submission.
 

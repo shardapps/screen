@@ -1,6 +1,6 @@
 # Architecture and safety
 
-Screen uses C++20 with Win32, GDI, common controls, DWM, and Windows session notifications. It statically links the C runtime; no redistributable installer or managed/browser runtime is required. Windows still supplies the system DLLs. This baseline intentionally avoids adding a Windows App SDK runtime solely for a small dimming utility.
+Screen uses C++20 with Win32, GDI, common controls, DWM, the Windows Magnification color API, and session notifications. It statically links the C runtime; no redistributable installer or managed/browser runtime is required. Windows still supplies the system DLLs. This baseline intentionally avoids adding a Windows App SDK runtime solely for a small dimming utility.
 
 ## Thread ownership
 
@@ -10,7 +10,15 @@ The worker owns a hidden notification window and all overlay windows. Submission
 
 Settings persistence runs on that worker after a committed control change. Thumb-tracking updates remain in memory until release. The worker flushes a temporary settings file and replaces the destination with `MoveFileExW`; failures are reported to the UI. There is no periodic autosave thread.
 
-## Display surfaces
+## Full-desktop color processing
+
+When all attached displays have the same requested level, the worker uses [MagSetFullscreenColorEffect](https://learn.microsoft.com/en-us/windows/win32/api/magnification/nf-magnification-magsetfullscreencoloreffect). The RGB gain is `1 − opacity/255`; optional warm offsets reproduce the overlay tint. This applies to the composited desktop instead of competing in window Z order, addressing full-screen app layers that outrank normal overlays. It does not call zoom, input-transform or cursor APIs. No captured frames or per-frame screen-sized buffers are allocated by Screen. Screen's own flyout is included in the color effect.
+
+`DesktopDimmer` lazily initializes the Windows runtime, records its original color matrix, and composes the dimming after it. It caches its applied matrix, checks ownership before changing/restoring it, and releases the runtime when transparent. Another color client can make writes unavailable; Screen falls back to overlays without replacing that client's transform. A new user adjustment retries the desktop backend. Active-only audits check color state rather than window order in desktop mode.
+
+Different per-display levels cannot be represented by a single full-desktop matrix. Those settings, API failure, and the explicit `--overlay` compatibility option use the existing surfaces below. The active footer identifies Desktop or Overlay. The default command line supports `--background` and `--overlay` together.
+
+## Compatibility display surfaces
 
 `EnumDisplayMonitors` and `GetMonitorInfoW` supply each display's full bounds, including negative desktop coordinates. One borderless surface per monitor uses:
 
@@ -39,7 +47,7 @@ Opacity uses exact critically damped integration with a monotonic clock and reta
 
 Timing follows Windows scheduling and desktop composition; no particular refresh rate is promised. The app never increases global timer resolution or spins waiting for a frame. Warm color changes are immediate. Both opacity and panel transitions respect the user preference and Windows' client-area animation setting.
 
-At zero opacity the surface is hidden. At steady nonzero opacity it remains visible, without an application animation timer. DWM still incurs composition costs that must be measured separately.
+At zero opacity the compatibility surface is hidden and the desktop color runtime is released. At steady nonzero opacity there is no application animation timer. DWM still incurs processing/composition costs that must be measured separately.
 
 ## Compact controls
 
@@ -53,8 +61,8 @@ The panel uses system-aware light/dark/high-contrast colors. Opening takes about
 - Dimming is capped at approximately 92% opacity; corrupt settings cannot create a fully opaque black screen.
 - Emergency restore pauses and resets all brightness overrides to 100%, bypassing animation.
 - Rendering/window-creation failure destroys every current surface and notifies the UI.
-- Session lock hides overlays immediately and cancels their fade timer. Unlock resumes the current preference.
-- Explicit quit joins the worker, destroys its surfaces, removes the tray icon, and unregisters hotkeys. Windows removes process windows if the process crashes or is terminated.
+- Session lock releases the desktop color effect, hides overlays immediately and cancels their fade timer. Unlock resumes the current preference.
+- Explicit quit restores the prior color state, releases the color runtime, joins the worker, destroys its surfaces, removes the tray icon, and unregisters hotkeys. Windows removes process windows and this client's desktop effect on forced termination; the native regression test exercises that cleanup.
 - Explorer restart re-registers the tray icon. If no tray icon can be created, the control window remains reachable.
 
 There is no elevation, `uiAccess`, service, driver, exclusive input hook, or secure-desktop access. `runFullTrust` in the MSIX manifest means a normal desktop process. See [Microsoft's packaging guidance](https://learn.microsoft.com/en-us/windows/msix/desktop/desktop-to-uwp-manual-conversion).

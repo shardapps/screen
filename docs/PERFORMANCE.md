@@ -1,5 +1,17 @@
 # Performance measurements
 
+## v0.3.0 desktop backend sample
+
+Measured October 19, 2026: Release x64, MSVC 19.51, Windows 11 build 26200, one display. Two separate processes started paused; the active process then received an All displays slider change to 99%. After a two-second settling interval, process CPU deltas were sampled over ten seconds. Preferences were restored after the measurement.
+
+| Metric | Paused tray | Active desktop color effect |
+| --- | ---: | ---: |
+| Working set | 13.54 MiB | 13.79 MiB |
+| Private committed memory | 2.21 MiB | 2.24 MiB |
+| Process CPU time delta | 0.0 ms | 15.625 ms |
+
+The executable was 421,888 bytes (412 KiB). This single sample confirms no large process-memory increase from the new path on this machine; it is not a universal budget or a measurement of Windows compositor/GPU allocations. Active steady state retains the small four-times-per-second color-state audit, with no animation timer or screen-copy loop. Keep the historical overlay sample below separate when assessing regressions.
+
 ## v0.2.0 development baseline
 
 Measured October 18, 2026: Release x64, MSVC 19.51, Windows 11 build 26200, one connected display, after a two-second warmup, over ten-second samples. The active sample applies a full-screen overlay at 99% brightness; deeper dimming has the same surface dimensions.
