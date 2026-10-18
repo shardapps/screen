@@ -1,0 +1,33 @@
+name: Bug report
+description: Report a reproducible problem with Screen
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "For vulnerabilities, use SECURITY.md. Remove personal information from screenshots and diagnostics."
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the actual and expected behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. Start Screen..."
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Version and display setup
+      description: Screen commit/version, Windows build, x64/ARM64, GPU/driver, display count/resolution/scaling, SDR/HDR, portable/MSIX. Do not include serial numbers or personal machine names.
+    validations:
+      required: true
+  - type: textarea
+    id: recovery
+    attributes:
+      label: Recovery and relevant evidence
+      description: Did pause, emergency restore, or quit help? Include only sanitized screenshots or logs.

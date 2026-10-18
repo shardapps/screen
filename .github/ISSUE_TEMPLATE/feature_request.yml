@@ -1,0 +1,18 @@
+name: Feature request
+description: Propose a focused improvement
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem should Screen solve?
+      description: Describe the use case and current workaround.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior and tradeoffs
+      description: Include implications for memory, CPU, privacy, accessibility, and display recovery.
+    validations:
+      required: true
