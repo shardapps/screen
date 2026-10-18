@@ -81,6 +81,12 @@ void OverlayEngine::submit(const Settings& settings, bool persist, bool rebuildR
 }
 void OverlayEngine::reportFailure() {
     // Fail open: remove every dimming surface if the overlay cannot be maintained safely.
+    active_.paused = true;
+    {
+        const std::lock_guard lock(mutex_);
+        desired_.paused = true;
+    }
+    // Display broadcasts must not revive the last active opacity after an error.
     KillTimer(control_, 1);
     for (const auto& surface : surfaces_) DestroyWindow(surface.window);
     surfaces_.clear();
