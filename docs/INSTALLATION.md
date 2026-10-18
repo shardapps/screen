@@ -2,7 +2,7 @@
 
 ## Normal setup
 
-Download the `Screen-preview-x64` CI artifact for Intel/AMD Windows, or `Screen-preview-arm64` for Windows on Arm. Extract it and open `Screen-Setup-0.2.1-x64.exe` or its ARM64 equivalent.
+Download the `Screen-preview-x64` CI artifact for Intel/AMD Windows, or `Screen-preview-arm64` for Windows on Arm. Extract it and open `Screen-Setup-0.3.0-x64.exe` or its ARM64 equivalent.
 
 Setup installs under `%LOCALAPPDATA%\Programs\Shardapps\Screen`, creates **Shardapps → Screen by Shardapps** in the Start menu, and registers a per-user uninstall entry. A desktop shortcut is optional. It needs no administrator rights and does not add certificates or change trust settings. Close Screen using its tray menu before reinstalling, upgrading, or uninstalling it.
 

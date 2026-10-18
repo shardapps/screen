@@ -4,7 +4,7 @@ param(
     [Parameter(Mandatory)][string]$Executable,
     [Parameter(Mandatory)][ValidatePattern('^[A-Za-z0-9.-]{3,50}$')][string]$IdentityName,
     [Parameter(Mandatory)][string]$Publisher,
-    [ValidatePattern('^\d+\.\d+\.\d+\.0$')][string]$Version = '0.2.1.0',
+    [ValidatePattern('^\d+\.\d+\.\d+\.0$')][string]$Version = '0.3.0.0',
     [string]$OutputDirectory = 'dist'
 )
 $ErrorActionPreference = 'Stop'

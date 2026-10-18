@@ -1,6 +1,6 @@
 # Privacy policy — Screen by Shardapps
 
-Effective date: October 18, 2026. Applies to the source and v0.2.1 developer preview in this repository.
+Effective date: October 18, 2026. Applies to the source and v0.3.0 developer preview in this repository.
 
 Screen does not collect, transmit, sell, or share personal data. It has no account system, telemetry, advertising, analytics SDK, network client, screenshot capture, or keystroke recording.
 

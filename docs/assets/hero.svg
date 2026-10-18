@@ -15,7 +15,7 @@
     <text x="68" y="230" font-size="84" font-weight="650" fill="#fff">Screen.</text>
     <text x="73" y="298" font-size="40" fill="url(#accent)">Less glare.</text>
     <text x="73" y="351" font-size="40" fill="url(#accent)">More room to focus.</text>
-    <text x="75" y="410" font-size="19" fill="#bbb6d2">A lightweight overlay screen dimmer</text>
+    <text x="75" y="410" font-size="19" fill="#bbb6d2">A lightweight desktop screen dimmer</text>
     <text x="75" y="440" font-size="19" fill="#bbb6d2">for Windows 11. Native. Quiet. Yours.</text>
     <g font-size="14" fill="#dedaf1">
       <rect x="75" y="490" width="116" height="35" rx="17" fill="#ffffff" fill-opacity=".07"/><text x="94" y="513">C++20 / Win32</text>

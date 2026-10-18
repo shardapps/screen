@@ -76,7 +76,7 @@ function Assert-Above([IntPtr]$surface, [IntPtr]$other) {
 }
 try {
     [void][ScreenSmoke]::SetThreadDpiAwarenessContext([IntPtr](-4))
-    $process = Start-Process -FilePath $binary -ArgumentList '--background' -WindowStyle Hidden -PassThru
+    $process = Start-Process -FilePath $binary -ArgumentList '--background','--overlay' -WindowStyle Hidden -PassThru
     $window = [IntPtr]::Zero
     for ($i = 0; $i -lt 100 -and $window -eq [IntPtr]::Zero; $i++) {
         Start-Sleep -Milliseconds 100

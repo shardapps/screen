@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0 — desktop dimming for full-screen apps
+
+- Use Windows' full-screen color transform for uniform brightness across all displays, avoiding the window-order limitation of a black overlay over full-screen app surfaces.
+- Retain the 8% floor, smooth transitions, warm tint, pause and immediate restore; the desktop effect includes Screen's own panel.
+- Keep the overlay renderer for different per-display brightness levels, a busy/unavailable color API, or the explicit `--overlay` compatibility option. The flyout reports Desktop or Overlay while active.
+- Preserve existing color state and restore on pause, lock and quit. Test forced-exit cleanup and coexistence with another color client.
+- Add portable color-matrix tests and native desktop-effect/installed-app regression checks. No elevation, driver, zoom, screen capture or hardware brightness changes are required.
+
 ## 0.2.1 — slider polish
 
 - Remove stale thumb trails and native trackbar fragments during dragging with complete buffered slider frames.

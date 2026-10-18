@@ -35,7 +35,9 @@ Replace `x64` with `ARM64` and use a separate build directory for a cross-build.
 
 ## Tests and diagnostics
 
-Core tests check opacity boundaries, pause, brightness clamping, animation bounds/settling/rapid retargeting, and monitor override isolation. The Windows smoke test launches the real executable, checks overlay styles/hit-testing/startup alpha, sends display/resume changes, recovers a destroyed surface, then moves surfaces offscreen before testing nonzero opacity. A foreign-process topmost window repeatedly promotes above them without injected foreground events; the test verifies coverage repair. It also checks rapid slider input, emergency restore, compact panel dimensions/work-area anchoring, dismissal and shutdown. It preserves the settings file and refuses to run alongside an existing instance. Actual shortcut key delivery, lock/unlock, physical display reconnection and HDR remain manual checks.
+Core tests check opacity boundaries, pause, brightness clamping, animation bounds/settling/rapid retargeting, monitor overrides, and desktop color-matrix composition/floors. The Windows smoke test launches with `--overlay`, checks styles/hit-testing/startup alpha, sends display/resume changes, recovers a destroyed surface, then moves surfaces offscreen before testing nonzero opacity. A foreign-process topmost window repeatedly promotes above them without injected foreground events; the test verifies coverage repair. It also checks rapid slider input, emergency restore, compact panel dimensions/work-area anchoring, dismissal and shutdown.
+
+Run `./scripts/desktop-test.ps1 -Executable build/x64/Release/Screen.exe` to test the default renderer. This visibly dims the desktop briefly, verifies matrix readback/tint/rapid input/display-resume/session messages, emergency restore, graceful and forced exit cleanup, and coexistence with another color client. It explicitly reports a skip if the Windows color API cannot initialize in the test session. Both native tests preserve the exact settings file and refuse to run alongside Screen. Actual shortcut delivery, a physical lock/unlock cycle, display reconnection, HDR, DRM and exclusive games remain manual checks.
 
 The portable core also builds on Linux/macOS with CMake and a C++20 compiler. Only the Windows executable controls a screen.
 
@@ -51,7 +53,7 @@ Run `python scripts/generate_assets.py` after changing the deterministic icon ge
 
 ```powershell
 ./scripts/installer.ps1 -Architecture x64 -Executable build/x64/Release/Screen.exe
-./scripts/test-installer.ps1 -Installer dist/Screen-Setup-0.2.1-x64.exe
+./scripts/test-installer.ps1 -Installer dist/Screen-Setup-0.3.0-x64.exe
 ```
 
 The installer helper discovers ISCC.exe in standard locations or accepts `-InnoCompiler`. It checks the executable's architecture and refuses to overwrite an existing setup output. The test uses a unique folder under `build/`, installs for the current user, verifies the Start menu and uninstall entry, runs the real app smoke test, reinstalls, and uninstalls. It refuses to run if Screen is already installed or running, and preserves preferences through the app smoke test. Use a clean test profile on Windows on Arm to test the ARM64 installer.

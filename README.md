@@ -18,9 +18,9 @@ Software brightness control across your desktop, with smooth fades, per-monitor 
 
 </div>
 
-Screen by **Shardapps** places a transparent, click-through black layer over each display. Lowering the brightness slider makes that layer more opaque, reducing the perceived brightness of ordinary desktop apps together. It works independently of a monitor's brightness API and does not change hardware backlight settings.
+Screen by **Shardapps** dims Windows desktop output using a full-desktop color transform, with click-through overlays for separate per-display levels and compatibility. Lower the slider to reduce perceived brightness across apps, including ordinary full-screen video app layers. It works independently of a monitor's brightness API and does not change hardware backlight settings.
 
-**Status: developer preview, v0.2.1.** CI produces per-user setup EXEs and portable ZIPs. Unsigned MSIX files are separate packaging-validation artifacts, not normal installers. Microsoft Store publication and certification are pending; there is no Store listing yet.
+**Status: developer preview, v0.3.0.** CI produces per-user setup EXEs and portable ZIPs. Unsigned MSIX files are separate packaging-validation artifacts, not normal installers. Microsoft Store publication and certification are pending; there is no Store listing yet.
 
 ## Built to stay out of your way
 
@@ -30,17 +30,17 @@ Screen by **Shardapps** places a transparent, click-through black layer over eac
 | Multi-monitor dimming | Adjust all displays together or select one display. Monitor geometry refreshes when Windows reports a display change. |
 | Compact flyout | A 330 × 136 panel above the bottom-right taskbar. Open with Alt+S, adjust the slider, then click outside or press Escape. |
 | Smooth transitions | Velocity-preserving fades keep moving through rapid slider updates. Short panel transitions respect Windows' animation preference. |
-| Optional warm tint | Switch the black overlay to a subtle warm color. This changes displayed colors. |
+| Optional warm tint | Add a subtle warm color while dimming. This changes displayed colors. |
 | Background controls | Close to the system tray; reopen, pause, restore, or quit from its menu. |
 | Keyboard access | Alt+S opens/hides the panel. Native arrow/page keys adjust its slider; global brightness, pause, and emergency restore shortcuts remain available. |
 | Recovery by design | Transparent startup, an 8% brightness floor, immediate emergency restore, and automatic overlay cleanup on exit. |
-| Coverage repair | Window events and a lightweight active-only order audit repair ordinary windows moving above the dimming layer. |
+| Full-screen app coverage | Desktop color processing avoids the overlay's window-order limit; a compatibility renderer remains available. |
 | Local and private | No account, telemetry, advertising, network client, or administrator prompt. |
 
 <details>
 <summary>See the actual Windows app</summary>
 
-<img src="docs/assets/screenshot.png" alt="Actual Screen v0.2.1 compact Windows 11 flyout with a brightness slider, percentage and Alt+S shortcut" width="380" />
+<img src="docs/assets/screenshot.png" alt="Actual Screen v0.3.0 compact Windows 11 flyout with a brightness slider, percentage and Alt+S shortcut" width="380" />
 
 Paused startup at 150% display scaling. The hero above is an interface illustration.
 
@@ -50,7 +50,7 @@ Paused startup at 150% display scaling. The hero above is an interface illustrat
 
 1. Open a successful [Windows CI run](https://github.com/shardapps/screen/actions/workflows/ci.yml). GitHub requires sign-in to download workflow artifacts.
 2. Download `Screen-preview-x64` for an Intel/AMD PC, or `Screen-preview-arm64` for Windows on Arm, and extract the artifact ZIP.
-3. Quit any older Screen copy from its tray menu, then run **`Screen-Setup-0.2.1-x64.exe`** (or ARM64 setup). It updates the existing per-user installation, adds a Start menu shortcut, and supports uninstall through **Settings → Apps**. Alternatively, extract the portable ZIP completely and run `Screen.exe`. These previews are unsigned; Windows may show an unknown publisher/SmartScreen warning, and managed policies may block them. Review the source/build before running them.
+3. Quit any older Screen copy from its tray menu, then run **`Screen-Setup-0.3.0-x64.exe`** (or ARM64 setup). It updates the existing per-user installation, adds a Start menu shortcut, and supports uninstall through **Settings → Apps**. Alternatively, extract the portable ZIP completely and run `Screen.exe`. These previews are unsigned; Windows may show an unknown publisher/SmartScreen warning, and managed policies may block them. Review the source/build before running them.
 4. Move the slider to enable dimming. Screen always starts paused; your saved brightness and preferences are retained. Right-click the tray icon or panel for display selection, warm tint, smooth transitions, pause, restore and quit.
 
 Alt+S toggles the flyout. Click outside it or press Escape to dismiss it while dimming continues. Choose **Quit** in the tray menu to stop Screen and restore the desktop. `Screen.exe --background` starts in the tray, paused. Automatic startup is not enabled by this preview.
@@ -72,32 +72,37 @@ Other software can reserve a shortcut. The flyout shows the opening shortcut tha
 ```mermaid
 flowchart LR
     A[Native controls / tray / shortcuts] --> B[Coalesced settings snapshot]
-    B --> C[Overlay worker thread]
-    C --> D[One click-through window per display]
+    B --> C[Rendering worker thread]
+    C --> H[Uniform levels: full-desktop color transform]
+    C --> D[Per-display / compatibility: click-through overlays]
+    H --> E
     D --> E[Windows desktop compositor]
     C --> F[Local settings file]
     G[Emergency restore] --> C
 ```
 
-The overlay is a standard Windows layered window with transparent input and no activation. Windows routes clicks to the apps underneath. Opacity changes run only during a fade. Out-of-process window notifications repair stacking promptly, backed by a small order check four times per second only while dimming is active. Paused and 100% brightness disable that audit. There is no screen capture, driver, or busy loop. See [architecture and safety](docs/ARCHITECTURE.md).
+With uniform brightness across all displays, Screen uses Windows' [full-screen color API](https://learn.microsoft.com/en-us/windows/win32/api/magnification/nf-magnification-magsetfullscreencoloreffect). It dims desktop output rather than trying to keep a black window above every app. This covers ordinary full-screen app layers that can bypass a topmost overlay. It changes colors without changing zoom, resolution, pointer coordinates or hardware brightness. The effect also dims Screen's own panel.
+
+Different per-display levels, a busy/unavailable color API, or `Screen.exe --overlay` use the compatibility overlay renderer. The active flyout footer identifies **Desktop** or **Overlay**. Overlay mode retains click-through input and stacking repair, with its narrower full-screen coverage. Both paths animate only during changes and run a small active-only audit; paused and 100% brightness disable that audit. There is no screen capture, driver, or busy loop. See [architecture and safety](docs/ARCHITECTURE.md).
 
 ### A measured starting point
 
-Local x64 development samples on Windows 11 build 26200, with one connected display:
+Local v0.3.0 x64 samples on Windows 11 build 26200, with one connected display:
 
-| Measurement | Paused | Active overlay at 99% |
+| Measurement | Paused | Active desktop dimming at 99% |
 | --- | ---: | ---: |
-| Process working set | 12.96 MiB | 13.09 MiB |
-| Private committed memory | 2.13 MiB | 2.10 MiB |
-| Process CPU time over 10 seconds | 0 ms measured | 0 ms measured |
+| Process working set | 13.54 MiB | 13.79 MiB |
+| Private committed memory | 2.21 MiB | 2.24 MiB |
+| Process CPU time over 10 seconds | 0 ms measured | 15.625 ms measured |
 
-The development executable is about **405 KiB**. These are individual measurements, **not memory or CPU guarantees**, and exclude compositor/GPU memory. Resolution, display count, drivers, Windows version, and other activity affect results. [Measurement details](docs/PERFORMANCE.md).
+The development executable is about **412 KiB**. These are individual measurements, **not memory or CPU guarantees**, and exclude compositor/GPU memory. Resolution, display count, drivers, Windows version, and other activity affect results. [Measurement details](docs/PERFORMANCE.md).
 
 ## Compatibility and honest limits
 
 - Supported target: Windows 11, x64 and ARM64. No monitor control protocol or vendor SDK is required. ARM64 is cross-built in CI; physical ARM64 validation remains on the release checklist.
-- Intended for ordinary composited desktop apps, including borderless windows. Other topmost windows, protected video, remote sessions, HDR, and exclusive fullscreen apps need environment-specific testing and may bypass or alter the overlay.
-- Windows' secure desktop, UAC consent screen, sign-in screen, and lock screen are outside the app's control. Screen hides its overlays when the session locks.
+- Desktop mode targets composited Windows apps, including full-screen video app layers. Select **All displays** and adjust the slider to clear differing display overrides. The overlay fallback has narrower coverage; other topmost windows can outrank it.
+- Protected video, HDR, remote sessions and true exclusive full-screen games require environment-specific testing. No renderer is advertised as covering every Windows or hardware surface.
+- Windows' secure desktop, UAC consent screen, sign-in screen, and lock screen are outside the app's scope. Screen restores its desktop effect and hides overlays when the session locks.
 - A software overlay changes perceived brightness and color. It does not lower a backlight, guarantee power savings, calibrate a display, or provide a medical benefit.
 - Per-display preferences use Windows display device names. Windows can reassign those names after topology or driver changes; check your settings after reconnecting displays.
 
@@ -105,7 +110,7 @@ The development executable is about **405 KiB**. These are individual measuremen
 
 **Can Screen dim below my monitor's minimum brightness?**
 
-It can make the ordinary Windows desktop look darker by adding a software overlay, even when hardware brightness is already at minimum. The physical backlight remains unchanged.
+It can make desktop output look darker using a software color transform or compatibility overlay, even when hardware brightness is already at minimum. The physical backlight remains unchanged.
 
 **Does it work with external monitors?**
 
@@ -113,7 +118,7 @@ Screen enumerates displays through Windows and does not rely on DDC/CI support. 
 
 **Can I keep clicking and typing normally?**
 
-Yes. The overlay uses Windows' layered-window input transparency and does not take keyboard focus or install an input hook.
+Yes. Desktop mode leaves zoom and input coordinates unchanged. The compatibility overlay uses Windows' layered-window input transparency. Neither renderer installs an input hook or takes keyboard focus.
 
 **Does Screen need administrator or kernel permissions?**
 

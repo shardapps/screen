@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(Screen VERSION 0.2.1 LANGUAGES CXX)
+project(Screen VERSION 0.3.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -22,8 +22,8 @@ endif()
 
 if(WIN32)
   enable_language(RC)
-  add_executable(Screen WIN32 src/main.cpp src/overlay.cpp src/settings.cpp resources/Screen.rc)
-  target_link_libraries(Screen PRIVATE screen_core comctl32 dwmapi shell32 wtsapi32 ole32 uuid advapi32)
+  add_executable(Screen WIN32 src/main.cpp src/overlay.cpp src/desktop.cpp src/settings.cpp resources/Screen.rc)
+  target_link_libraries(Screen PRIVATE screen_core comctl32 dwmapi shell32 wtsapi32 ole32 uuid advapi32 Magnification)
   target_compile_definitions(Screen PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX _WIN32_WINNT=0x0A00)
   target_link_options(Screen PRIVATE /MANIFEST:NO)
   install(TARGETS Screen RUNTIME DESTINATION .)

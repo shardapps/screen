@@ -1,6 +1,8 @@
 #include "core.hpp"
+#include "color.hpp"
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 
 int main() {
     int failures = 0;
@@ -8,6 +10,24 @@ int main() {
         if (!ok) { std::cerr << message << '\n'; ++failures; }
     };
     using namespace screen;
+    const auto identity = identityColor();
+    check(sameColor(dimColor(identity, 0, false), identity), "Zero opacity must preserve the existing color matrix");
+    const auto half = dimColor(identity, 128, false);
+    check(std::abs(half[0][0] - 127 / 255.0f) < 0.00001f && half[3][3] == 1 && half[4][4] == 1,
+          "Desktop dimming must scale RGB while preserving alpha and coordinates");
+    const auto floor = dimColor(identity, 255, false);
+    check(std::abs(floor[0][0] - 20 / 255.0f) < 0.00001f, "Desktop matrix must retain the safe dimming floor");
+    auto inverted = identity;
+    for (int channel = 0; channel < 3; ++channel) { inverted[channel][channel] = -1; inverted[4][channel] = 1; }
+    const auto filtered = dimColor(inverted, 128, false);
+    check(std::abs(filtered[0][0] + 127 / 255.0f) < 0.00001f &&
+          std::abs(filtered[4][0] - 127 / 255.0f) < 0.00001f,
+          "Dimming must compose after an existing accessibility color filter");
+    const auto warm = dimColor(identity, 128, true);
+    check(warm[4][0] > warm[4][1] && warm[4][1] > warm[4][2] && warm[0][0] == half[0][0],
+          "Warm tint must use additive RGB offsets, not change the gain");
+    auto invalid = identity; invalid[0][0] = std::numeric_limits<float>::quiet_NaN();
+    check(!sameColor(invalid, identity), "Non-finite matrices must never compare equal");
     check(opacity(100, false) == 0, "Full brightness must remove the overlay");
     check(opacity(8, false) == 235, "Deeper dimming must retain the new brightness floor");
     check(opacity(-100, false) == 235, "Corrupt values must not black out the display");
