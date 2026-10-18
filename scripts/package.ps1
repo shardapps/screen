@@ -10,6 +10,18 @@ param(
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $binary = (Resolve-Path -LiteralPath $Executable).Path
+# Refuse to mislabel a native binary as a different architecture.
+$binaryReader = [IO.BinaryReader]::new([IO.File]::OpenRead($binary))
+try {
+    if ($binaryReader.ReadUInt16() -ne 0x5A4D) { throw 'Executable is not a Windows PE file.' }
+    [void]$binaryReader.BaseStream.Seek(0x3C, [IO.SeekOrigin]::Begin)
+    $peOffset = $binaryReader.ReadInt32()
+    [void]$binaryReader.BaseStream.Seek($peOffset, [IO.SeekOrigin]::Begin)
+    if ($binaryReader.ReadUInt32() -ne 0x00004550) { throw 'Invalid PE signature.' }
+    $machine = $binaryReader.ReadUInt16()
+    $expectedMachine = if ($Architecture -eq 'arm64') { 0xAA64 } else { 0x8664 }
+    if ($machine -ne $expectedMachine) { throw "Binary architecture does not match $Architecture." }
+} finally { $binaryReader.Dispose() }
 if (-not $Publisher.StartsWith('CN=')) { throw 'Publisher must be the full certificate subject from Partner Center, starting with CN=.' }
 $sdkRoot = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin'
 $sdk = Get-ChildItem -LiteralPath $sdkRoot -Directory |

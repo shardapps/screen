@@ -54,6 +54,9 @@ jobs:
           $portable = 'build/portable-${{ matrix.arch }}'
           New-Item -ItemType Directory -Path $portable -Force | Out-Null
           Copy-Item build/${{ matrix.arch }}/Release/Screen.exe,LICENSE,README.md -Destination $portable
+          foreach ($item in @('docs','PRIVACY.md','SECURITY.md','CONTRIBUTING.md','CODE_OF_CONDUCT.md','CHANGELOG.md')) {
+            if (Test-Path -LiteralPath $item) { Copy-Item -LiteralPath $item -Destination $portable -Recurse }
+          }
           Compress-Archive -Path "$portable/*" -DestinationPath dist/Screen-portable-${{ matrix.arch }}.zip
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

@@ -8,6 +8,9 @@ on:
     - cron: '20 5 * * 1'
 permissions:
   contents: read
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   analyze:
     runs-on: windows-2025
