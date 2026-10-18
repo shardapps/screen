@@ -83,7 +83,7 @@ struct App {
         move(slider, 18, 57, 294, 34);
         move(footer, 24, 105, 207, 18); move(shortcut, 235, 105, 71, 18);
         RECT client{}; GetClientRect(window, &client);
-        SetWindowRgn(window, CreateRoundRectRgn(0, 0, client.right + 1, client.bottom + 1, px(22), px(22)), TRUE);
+        SetWindowRgn(window, CreateRoundRectRgn(0, 0, client.right, client.bottom, px(22), px(22)), TRUE);
     }
     void createControls() {
         // Keep the native slider and preceding label for keyboard and MSAA/UIA support.
@@ -92,7 +92,7 @@ struct App {
         value = control(L"STATIC", L"70%", SS_RIGHT | SS_NOPREFIX, 0);
         footer = control(L"STATIC", L"Paused · All displays", SS_NOPREFIX, 0);
         shortcut = control(L"STATIC", shortcutText.c_str(), SS_RIGHT | SS_NOPREFIX, 0);
-        SetWindowSubclass(slider, sliderProcedure, 1, 0);
+        SetWindowSubclass(slider, sliderProcedure, 1, reinterpret_cast<DWORD_PTR>(this));
         SendMessageW(slider, TBM_SETRANGE, TRUE, MAKELPARAM(screen::minBrightness, screen::maxBrightness));
         SendMessageW(slider, TBM_SETPAGESIZE, 0, 5);
         fonts(); layout(); sync();
@@ -256,23 +256,62 @@ struct App {
         paintRound({channel.left, y - px(2), channel.right, y + px(3)}, px(5), track);
         if (center > channel.left) paintRound({channel.left, y - px(2), center, y + px(3)}, px(5), accent);
         const auto radius = px(GetCapture() == slider ? 7 : 8);
-        paintRound({center - radius, y - radius, center + radius + 1, y + radius + 1}, radius * 2, accent);
-        if (GetFocus() == slider) {
-            const auto pen = CreatePen(PS_DOT, 1, muted);
-            const auto oldPen = SelectObject(dc, pen), oldBrush = SelectObject(dc, GetStockObject(NULL_BRUSH));
-            RoundRect(dc, client.left + 1, client.top + 1, client.right - 1, client.bottom - 1, px(10), px(10));
-            SelectObject(dc, oldBrush); SelectObject(dc, oldPen); DeleteObject(pen);
+        const auto brush = CreateSolidBrush(accent);
+        const auto oldBrush = SelectObject(dc, brush), oldPen = SelectObject(dc, GetStockObject(NULL_PEN));
+        Ellipse(dc, center - radius, y - radius, center + radius + 1, y + radius + 1);
+        SelectObject(dc, oldPen); SelectObject(dc, oldBrush); DeleteObject(brush);
+        if (GetFocus() == slider && !(SendMessageW(slider, WM_QUERYUISTATE, 0, 0) & UISF_HIDEFOCUS)) {
+            const auto pen = CreatePen(PS_SOLID, 1, muted);
+            const auto focusPen = SelectObject(dc, pen), focusBrush = SelectObject(dc, GetStockObject(NULL_BRUSH));
+            const auto focusRadius = radius + px(3);
+            Ellipse(dc, center - focusRadius, y - focusRadius, center + focusRadius + 1, y + focusRadius + 1);
+            SelectObject(dc, focusBrush); SelectObject(dc, focusPen); DeleteObject(pen);
         }
+    }
+    void renderSlider(HDC target) {
+        RECT client{}; GetClientRect(slider, &client);
+        if (!client.right || !client.bottom) return;
+        // Native trackbar invalidation only covers its own thumb geometry. Paint a
+        // complete buffered frame so our circular thumb never leaves stale pixels.
+        const auto buffer = CreateCompatibleDC(target);
+        const auto bitmap = CreateCompatibleBitmap(target, client.right, client.bottom);
+        if (buffer && bitmap) {
+            const auto previous = SelectObject(buffer, bitmap);
+            paintSlider(buffer);
+            BitBlt(target, 0, 0, client.right, client.bottom, buffer, 0, 0, SRCCOPY);
+            SelectObject(buffer, previous);
+        } else paintSlider(target);
+        if (bitmap) DeleteObject(bitmap);
+        if (buffer) DeleteDC(buffer);
     }
 };
 
-LRESULT CALLBACK sliderProcedure(HWND window, UINT message, WPARAM wParam, LPARAM lParam, UINT_PTR, DWORD_PTR) {
+LRESULT CALLBACK sliderProcedure(HWND window, UINT message, WPARAM wParam, LPARAM lParam, UINT_PTR, DWORD_PTR data) {
+    auto* app = reinterpret_cast<App*>(data);
     if (message == WM_ERASEBKGND) return 1;
+    // Let the native paint path initialize its theme/input geometry, but expand
+    // partial invalidations before BeginPaint so the entire custom frame fits.
+    if (message == WM_PAINT) InvalidateRect(window, nullptr, FALSE);
+    if (message == WM_PRINTCLIENT) { app->renderSlider(reinterpret_cast<HDC>(wParam)); return 0; }
     if (message == WM_KEYDOWN && wParam == VK_ESCAPE) { PostMessageW(GetParent(window), WM_CLOSE, 0, 0); return 0; }
     if (message == WM_CONTEXTMENU) { SendMessageW(GetParent(window), message, wParam, lParam); return 0; }
-    if (message == WM_SETFOCUS || message == WM_KILLFOCUS) InvalidateRect(window, nullptr, FALSE);
+    if (message == WM_LBUTTONDOWN)
+        SendMessageW(window, WM_UPDATEUISTATE, MAKEWPARAM(UIS_SET, UISF_HIDEFOCUS), 0);
+    if (message == WM_KEYDOWN)
+        SendMessageW(window, WM_UPDATEUISTATE, MAKEWPARAM(UIS_CLEAR, UISF_HIDEFOCUS), 0);
     if (message == WM_NCDESTROY) RemoveWindowSubclass(window, sliderProcedure, 1);
-    return DefSubclassProc(window, message, wParam, lParam);
+    const auto result = DefSubclassProc(window, message, wParam, lParam);
+    switch (message) {
+    case TBM_SETPOS: case TBM_SETRANGE: case TBM_SETRANGEMIN: case TBM_SETRANGEMAX:
+    case WM_MOUSEMOVE:
+        if (wParam & MK_LBUTTON) InvalidateRect(window, nullptr, FALSE);
+        break;
+    case WM_LBUTTONDOWN: case WM_LBUTTONUP: case WM_CAPTURECHANGED:
+    case WM_KEYDOWN: case WM_KEYUP: case WM_MOUSEWHEEL:
+    case WM_SETFOCUS: case WM_KILLFOCUS: case WM_UPDATEUISTATE:
+        InvalidateRect(window, nullptr, FALSE); break;
+    }
+    return result;
 }
 LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
     auto* app = reinterpret_cast<App*>(GetWindowLongPtrW(window, GWLP_USERDATA));
@@ -314,8 +353,8 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
     case WM_NOTIFY:
         if (reinterpret_cast<NMHDR*>(lParam)->hwndFrom == app->slider &&
             reinterpret_cast<NMHDR*>(lParam)->code == NM_CUSTOMDRAW) {
-            auto* draw = reinterpret_cast<NMCUSTOMDRAW*>(lParam);
-            if (draw->dwDrawStage == CDDS_PREPAINT) { app->paintSlider(draw->hdc); return CDRF_SKIPDEFAULT; }
+            const auto* draw = reinterpret_cast<NMCUSTOMDRAW*>(lParam);
+            if (draw->dwDrawStage == CDDS_PREPAINT) { app->renderSlider(draw->hdc); return CDRF_SKIPDEFAULT; }
         }
         break;
     case WM_COMMAND: {

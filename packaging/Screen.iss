@@ -3,7 +3,7 @@
   #error AppBinary must point to a built Screen.exe
 #endif
 #ifndef AppVersion
-  #define AppVersion "0.2.0"
+  #define AppVersion "0.2.1"
 #endif
 #ifndef TargetArchitecture
   #error TargetArchitecture must be x64 or arm64

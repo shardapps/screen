@@ -51,7 +51,7 @@ Run `python scripts/generate_assets.py` after changing the deterministic icon ge
 
 ```powershell
 ./scripts/installer.ps1 -Architecture x64 -Executable build/x64/Release/Screen.exe
-./scripts/test-installer.ps1 -Installer dist/Screen-Setup-0.2.0-x64.exe
+./scripts/test-installer.ps1 -Installer dist/Screen-Setup-0.2.1-x64.exe
 ```
 
 The installer helper discovers ISCC.exe in standard locations or accepts `-InnoCompiler`. It checks the executable's architecture and refuses to overwrite an existing setup output. The test uses a unique folder under `build/`, installs for the current user, verifies the Start menu and uninstall entry, runs the real app smoke test, reinstalls, and uninstalls. It refuses to run if Screen is already installed or running, and preserves preferences through the app smoke test. Use a clean test profile on Windows on Arm to test the ARM64 installer.
