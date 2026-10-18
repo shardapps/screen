@@ -5,7 +5,7 @@ The `ci-cd-pipeline-builder` skill's detector and generator were run against the
 ## Windows CI
 
 - Runs on pushes to main and feature/fix/docs/CI branches, PRs targeting main, and manual dispatch.
-- Builds x64 and ARM64 separately on `windows-2025` with Visual Studio 2022 and the installed Windows SDK.
+- Builds x64 and ARM64 separately on `windows-2025` with the installed Windows SDK. `scripts/configure.ps1` detects Visual Studio 2022 or 2026 through vswhere and uses its matching generator/bundled CMake instead of assuming the runner's Visual Studio version.
 - Verifies deterministic generated artwork, compiles C++20 with warnings-as-errors, runs portable core tests and native-window smoke tests on x64, validates unsigned MSIX packages, and uploads portable ZIP/MSIX preview artifacts.
 - ARM64 is cross-compiled on x64; its executable and tests require a physical or compatible Windows on Arm runner for runtime validation.
 - A Linux job tests the portable core with address/undefined-behavior sanitizers.

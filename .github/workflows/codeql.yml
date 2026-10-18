@@ -22,6 +22,6 @@ jobs:
         with:
           languages: c-cpp
           build-mode: manual
-      - run: cmake -S . -B build/codeql -G "Visual Studio 17 2022" -A x64
+      - run: ./scripts/configure.ps1 -Architecture x64 -BuildDirectory build/codeql
       - run: cmake --build build/codeql --config Release --parallel
       - uses: github/codeql-action/analyze@f051dc808ef3645eb0d08647ec751634ec2304ac # v4
