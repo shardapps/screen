@@ -1,0 +1,27 @@
+name: CodeQL
+on:
+  push:
+    branches: [main, 'ci/**', 'docs/**']
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '20 5 * * 1'
+permissions:
+  contents: read
+jobs:
+  analyze:
+    runs-on: windows-2025
+    timeout-minutes: 20
+    permissions:
+      security-events: write
+      packages: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: github/codeql-action/init@f051dc808ef3645eb0d08647ec751634ec2304ac # v4
+        with:
+          languages: c-cpp
+          build-mode: manual
+      - run: cmake -S . -B build/codeql -G "Visual Studio 17 2022" -A x64
+      - run: cmake --build build/codeql --config Release --parallel
+      - uses: github/codeql-action/analyze@f051dc808ef3645eb0d08647ec751634ec2304ac # v4

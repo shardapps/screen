@@ -1,0 +1,73 @@
+name: Windows CI
+on:
+  push:
+    branches: [main, 'feat/**', 'fix/**', 'docs/**', 'ci/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Native ${{ matrix.arch }}
+    runs-on: windows-2025
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            platform: x64
+          - arch: arm64
+            platform: ARM64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Verify deterministic brand assets
+        run: |
+          python scripts/generate_assets.py
+          git diff --exit-code -- resources/Screen.ico packaging/Assets
+          if ($LASTEXITCODE -ne 0) { throw 'Generated assets differ; regenerate and commit them.' }
+      - name: Configure C++20 with Windows SDK
+        run: cmake -S . -B build/${{ matrix.arch }} -G "Visual Studio 17 2022" -A ${{ matrix.platform }}
+      - name: Compile with warnings as errors
+        run: cmake --build build/${{ matrix.arch }} --config Release --parallel
+      - name: Run core tests
+        if: matrix.arch == 'x64'
+        run: ctest --test-dir build/x64 -C Release --output-on-failure
+      - name: Check native Windows behavior
+        if: matrix.arch == 'x64'
+        run: ./scripts/smoke-test.ps1 -Executable build/x64/Release/Screen.exe
+      - name: Validate unsigned MSIX
+        run: |
+          ./scripts/package.ps1 -Architecture ${{ matrix.arch }} -Executable build/${{ matrix.arch }}/Release/Screen.exe -IdentityName Shardapps.Screen.Preview -Publisher 'CN=Shardapps-Preview'
+      - name: Assemble portable preview
+        run: |
+          $portable = 'build/portable-${{ matrix.arch }}'
+          New-Item -ItemType Directory -Path $portable -Force | Out-Null
+          Copy-Item build/${{ matrix.arch }}/Release/Screen.exe,LICENSE,README.md -Destination $portable
+          Compress-Archive -Path "$portable/*" -DestinationPath dist/Screen-portable-${{ matrix.arch }}.zip
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Screen-preview-${{ matrix.arch }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
+
+  portable-core:
+    name: Portable core / sanitizers
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: cmake -S . -B build/core -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="-Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer"
+      - run: cmake --build build/core --parallel
+      - run: ctest --test-dir build/core --output-on-failure
