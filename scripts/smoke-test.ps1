@@ -18,6 +18,7 @@ public static class ScreenSmoke {
     [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetClassName(IntPtr hwnd, StringBuilder cls, int count);
     [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hwnd, out Rect bounds);
+    [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
     [StructLayout(LayoutKind.Sequential)] public struct Rect { public int Left, Top, Right, Bottom; }
 }
 '@
@@ -59,6 +60,9 @@ try {
         [uint32]$color = 0; [byte]$alpha = 255; [uint32]$flags = 0
         if (-not [ScreenSmoke]::GetLayeredWindowAttributes($surface, [ref]$color, [ref]$alpha, [ref]$flags)) { throw 'Cannot read overlay alpha.' }
         if ($alpha -ne 0 -or [ScreenSmoke]::IsWindowVisible($surface)) { throw 'Startup must be fully transparent.' }
+        # Test real nonzero opacity only on tiny surfaces outside the visible desktop.
+        if (-not [ScreenSmoke]::SetWindowPos($surface, [IntPtr](-1), -32000, -32000, 16, 16, 0x0010)) { throw 'Cannot isolate test surface.' }
+        if ([ScreenSmoke]::SendMessage($surface, 0x0084, [IntPtr]0, [IntPtr]0).ToInt64() -ne -1) { throw 'Overlay must return HTTRANSPARENT.' }
     }
     # Set full brightness before activating; this exercises the command/worker path at zero opacity.
     [void][ScreenSmoke]::SendMessage($slider, 0x0405, [IntPtr]1, [IntPtr]100) # TBM_SETPOS
@@ -69,14 +73,28 @@ try {
         [void][ScreenSmoke]::GetLayeredWindowAttributes($surface, [ref]$color, [ref]$alpha, [ref]$flags)
         if ($alpha -ne 0) { throw '100 percent brightness must remain transparent.' }
     }
+    [void][ScreenSmoke]::SendMessage($slider, 0x0405, [IntPtr]1, [IntPtr]15)
+    [void][ScreenSmoke]::SendMessage($window, 0x0114, [IntPtr]8, $slider)
+    Start-Sleep -Milliseconds 350
+    foreach ($surface in $script:surfaces) {
+        [uint32]$color = 0; [byte]$alpha = 0; [uint32]$flags = 0
+        [void][ScreenSmoke]::GetLayeredWindowAttributes($surface, [ref]$color, [ref]$alpha, [ref]$flags)
+        if ($alpha -ne 217 -or -not [ScreenSmoke]::IsWindowVisible($surface)) { throw 'Active dimming did not settle at its bounded opacity.' }
+    }
     # Exercise the emergency message and close-to-tray behavior.
     [void][ScreenSmoke]::SendMessage($window, 0x0312, [IntPtr]4, [IntPtr]0)
+    Start-Sleep -Milliseconds 100
+    foreach ($surface in $script:surfaces) {
+        [uint32]$color = 0; [byte]$alpha = 255; [uint32]$flags = 0
+        [void][ScreenSmoke]::GetLayeredWindowAttributes($surface, [ref]$color, [ref]$alpha, [ref]$flags)
+        if ($alpha -ne 0 -or [ScreenSmoke]::IsWindowVisible($surface)) { throw 'Emergency restore must hide every overlay.' }
+    }
     [void][ScreenSmoke]::SendMessage($window, 0x0010, [IntPtr]0, [IntPtr]0)
     if ($process.HasExited) { throw 'Closing the control window must keep the tray process alive.' }
     [void][ScreenSmoke]::SendMessage($window, 0x0111, [IntPtr]107, [IntPtr]0)
     if (-not $process.WaitForExit(5000)) { throw 'Quit did not stop both threads.' }
     if ($process.ExitCode -ne 0) { throw "Screen exited with $($process.ExitCode)." }
-    Write-Output "PASS: $($script:surfaces.Count) monitor(s), safety styles, transparent startup, full brightness, restore, tray lifecycle, clean shutdown."
+    Write-Output "PASS: $($script:surfaces.Count) monitor(s), safety styles, input hit-test, transparent startup, bounded active opacity, restore, tray lifecycle, clean shutdown."
 } finally {
     if ($process -and -not $process.HasExited) { Stop-Process -Id $process.Id -Force; $process.WaitForExit() }
     if ($hadSettings) { [IO.File]::WriteAllBytes($settingsFile, $savedBytes) }
