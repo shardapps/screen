@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="title desc">
+  <title id="title">Screen by Shardapps — a softer screen, a quieter workspace</title>
+  <desc id="desc">Illustrated preview of the lightweight Windows 11 screen dimmer: brightness slider, display selector, warm tint, smooth transitions, restore and tray controls.</desc>
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#101125"/><stop offset="1" stop-color="#28234c"/></linearGradient>
+    <linearGradient id="accent" x2="1" y2="1"><stop stop-color="#b5adff"/><stop offset="1" stop-color="#75d7e5"/></linearGradient>
+    <linearGradient id="tile" x2="1" y2="1"><stop stop-color="#6555df"/><stop offset="1" stop-color="#8170f2"/></linearGradient>
+  </defs>
+  <rect width="1280" height="640" rx="28" fill="url(#bg)"/>
+  <circle cx="1100" cy="90" r="280" fill="#8f83f4" opacity=".055"/>
+  <circle cx="1010" cy="550" r="320" fill="#79d5df" opacity=".035"/>
+  <g font-family="Segoe UI,Arial,sans-serif">
+    <rect x="72" y="72" width="56" height="56" rx="17" fill="url(#tile)"/>
+    <path d="M108 84a19 19 0 1 0 5 30 18 18 0 0 1-5-30" fill="#fffaeb"/>
+    <text x="146" y="108" font-size="17" fill="#c6c0e0" letter-spacing="3">SHARDAPPS</text>
+    <text x="68" y="230" font-size="84" font-weight="650" fill="#fff">Screen.</text>
+    <text x="73" y="298" font-size="40" fill="url(#accent)">Less glare.</text>
+    <text x="73" y="351" font-size="40" fill="url(#accent)">More room to focus.</text>
+    <text x="75" y="410" font-size="19" fill="#bbb6d2">A lightweight overlay screen dimmer</text>
+    <text x="75" y="440" font-size="19" fill="#bbb6d2">for Windows 11. Native. Quiet. Yours.</text>
+    <g font-size="14" fill="#dedaf1">
+      <rect x="75" y="490" width="116" height="35" rx="17" fill="#ffffff" fill-opacity=".07"/><text x="94" y="513">C++20 / Win32</text>
+      <rect x="202" y="490" width="130" height="35" rx="17" fill="#ffffff" fill-opacity=".07"/><text x="223" y="513">Multi-monitor</text>
+      <rect x="343" y="490" width="128" height="35" rx="17" fill="#ffffff" fill-opacity=".07"/><text x="361" y="513">Apache 2.0</text>
+    </g>
+    <text x="75" y="583" font-size="13" fill="#928ba9">Open source · No account · No telemetry · No administrator prompt</text>
+    <rect x="725" y="44" width="414" height="552" rx="21" fill="#050511" opacity=".3"/>
+    <rect x="715" y="36" width="414" height="552" rx="19" fill="#f6f7fb"/>
+    <text x="739" y="62" font-size="12" fill="#6c7083">Screen by Shardapps</text>
+    <path d="M1099 50l9 9m0-9-9 9" stroke="#7e8290" stroke-width="1.3"/>
+    <text x="742" y="99" font-size="10" fill="#8b889e" letter-spacing="1.5">SHARDAPPS / DESKTOP ESSENTIALS</text>
+    <text x="740" y="143" font-size="36" font-weight="600" fill="#252a3e">Screen</text>
+    <text x="743" y="168" font-size="13" fill="#747889">A softer screen. Your focus, uninterrupted.</text>
+    <rect x="738" y="189" width="368" height="181" rx="17" fill="#fff" stroke="#e2e4ec"/>
+    <text x="756" y="222" font-size="14" fill="#383e54">Brightness</text>
+    <text x="1083" y="244" text-anchor="end" font-size="43" fill="#252a3e">70%</text>
+    <rect x="757" y="268" width="330" height="5" rx="2.5" fill="#eceaf7"/>
+    <rect x="757" y="268" width="228" height="5" rx="2.5" fill="#7b68e8"/>
+    <circle cx="985" cy="270" r="9" fill="#fff" stroke="#7b68e8" stroke-width="4"/>
+    <text x="757" y="301" font-size="11" fill="#9495a4">Softer</text><text x="1086" y="301" font-size="11" text-anchor="end" fill="#9495a4">Original</text>
+    <rect x="757" y="321" width="330" height="31" rx="7" fill="#f0edf9"/>
+    <text x="922" y="341" text-anchor="middle" font-size="13" fill="#6551c6">Pause dimming</text>
+    <rect x="738" y="381" width="368" height="107" rx="17" fill="#fff" stroke="#e2e4ec"/>
+    <text x="756" y="411" font-size="13" fill="#383e54">Display</text>
+    <rect x="829" y="392" width="258" height="28" rx="5" fill="#f6f7fb"/><text x="844" y="411" font-size="12" fill="#60677c">All displays</text>
+    <circle cx="763" cy="443" r="6" fill="#e8c18d"/><text x="778" y="448" font-size="12" fill="#60677c">Warm tint</text>
+    <circle cx="925" cy="443" r="6" fill="#9486ed"/><text x="940" y="448" font-size="12" fill="#60677c">Smooth transitions</text>
+    <text x="922" y="474" text-anchor="middle" font-size="12" fill="#6551c6">Restore all displays</text>
+    <text x="743" y="515" font-size="11" fill="#7d8395">Dimming enabled. Keep your focus.</text>
+    <rect x="741" y="532" width="261" height="31" rx="7" fill="#e7e4f4"/><text x="871" y="552" font-size="12" text-anchor="middle" fill="#5e5285">Keep in tray</text>
+    <text x="1060" y="552" text-anchor="middle" font-size="12" fill="#798091">Quit</text>
+    <text x="922" y="618" text-anchor="middle" font-size="11" fill="#9a92b5">Interface illustration · Windows controls follow your system theme</text>
+  </g>
+</svg>
