@@ -2,6 +2,8 @@
 
 Screen includes an MSIX manifest for a Windows 11 desktop application. The committed identity is an explicit preview placeholder. A successfully generated unsigned package is not Store certification or a trusted local installer.
 
+For a normal local installation, use the setup EXE described in [installation help](INSTALLATION.md). CI separates setup/portable previews from `Screen-msix-validation-*` artifacts; unsigned MSIX is for packaging work only.
+
 ## Build a validation package
 
 ```powershell

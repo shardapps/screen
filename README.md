@@ -20,7 +20,7 @@ Software brightness control across your desktop, with smooth fades, per-monitor 
 
 Screen by **Shardapps** places a transparent, click-through black layer over each display. Lowering the brightness slider makes that layer more opaque, reducing the perceived brightness of ordinary desktop apps together. It works independently of a monitor's brightness API and does not change hardware backlight settings.
 
-**Status: developer preview, v0.1.0.** Portable Windows builds and unsigned MSIX previews are produced by CI. Microsoft Store publication and certification are pending; there is no Store listing yet.
+**Status: developer preview, v0.1.0.** CI produces per-user setup EXEs and portable ZIPs. Unsigned MSIX files are separate packaging-validation artifacts, not normal installers. Microsoft Store publication and certification are pending; there is no Store listing yet.
 
 ## Built to stay out of your way
 
@@ -47,11 +47,13 @@ Paused startup at 150% display scaling. The hero above is an interface illustrat
 ## Get started
 
 1. Open a successful [Windows CI run](https://github.com/shardapps/screen/actions/workflows/ci.yml). GitHub requires sign-in to download workflow artifacts.
-2. Download `Screen-preview-x64` for an Intel/AMD PC, or `Screen-preview-arm64` for Windows on Arm. Extract the portable ZIP inside it.
-3. Run `Screen.exe`. This preview is unsigned; Windows may show an unknown publisher warning. Review the source/build before running it.
+2. Download `Screen-preview-x64` for an Intel/AMD PC, or `Screen-preview-arm64` for Windows on Arm, and extract the artifact ZIP.
+3. Run the **`Screen-Setup-0.1.0-x64.exe`** (or ARM64 setup) inside. It installs for your current user, adds a Start menu shortcut, and supports uninstall through **Settings → Apps**. Alternatively, extract the portable ZIP completely and run `Screen.exe`. These previews are unsigned; Windows may show an unknown publisher/SmartScreen warning, and managed policies may block them. Review the source/build before running them.
 4. Choose a display and select **Enable dimming**, or move the slider. Screen always starts paused; your saved brightness and preferences are retained.
 
 Closing the window keeps Screen in the tray. Choose **Quit** to stop the app and restore the desktop. `Screen.exe --background` starts in the tray, paused. Automatic startup is not enabled by this preview.
+
+**MSIX install error?** `Screen-msix-validation-*` artifacts contain unsigned packages for packaging development. Windows App Installer does not accept them as normal trusted installers. Use the setup EXE or portable app above; see [installation help](docs/INSTALLATION.md).
 
 | Shortcut | Action |
 | --- | --- |
