@@ -1,0 +1,14 @@
+{
+  "version": 6,
+  "configurePresets": [
+    { "name": "windows-x64", "generator": "Visual Studio 18 2026", "architecture": "x64", "binaryDir": "${sourceDir}/build/x64" },
+    { "name": "windows-arm64", "generator": "Visual Studio 18 2026", "architecture": "ARM64", "binaryDir": "${sourceDir}/build/arm64" }
+  ],
+  "buildPresets": [
+    { "name": "release-x64", "configurePreset": "windows-x64", "configuration": "Release" },
+    { "name": "release-arm64", "configurePreset": "windows-arm64", "configuration": "Release" }
+  ],
+  "testPresets": [
+    { "name": "test-x64", "configurePreset": "windows-x64", "configuration": "Release", "output": { "outputOnFailure": true } }
+  ]
+}
