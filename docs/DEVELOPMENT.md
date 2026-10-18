@@ -6,6 +6,7 @@
 - Visual Studio 2022 (17.14+) or Visual Studio 2026 with **Desktop development with C++**, C++ x64/x86 tools, and Windows SDK 10.0.26100 or newer. Install the ARM64 C++ tools to cross-build ARM64.
 - CMake 3.25+ for manual configuration; 3.31+ is recommended. Visual Studio 2026 presets require a CMake version that supports its generator.
 - Python 3.12+ only to regenerate artwork. There are no Python dependencies or runtime NuGet/npm packages.
+- Inno Setup 6.3+ only to build conventional setup EXEs. See its [license](https://jrsoftware.org/files/is/license.txt). The app does not need Inno Setup installed to run.
 
 ## Visual Studio 2026 presets
 
@@ -45,6 +46,15 @@ ctest --test-dir build/core --output-on-failure
 ```
 
 Run `python scripts/generate_assets.py` after changing the deterministic icon generator. The PNG/ICO files are committed and CI verifies reproducibility. See [performance](PERFORMANCE.md) for measurement commands and [Store packaging](STORE.md) for MSIX.
+
+## Build and test a normal setup EXE
+
+```powershell
+./scripts/installer.ps1 -Architecture x64 -Executable build/x64/Release/Screen.exe
+./scripts/test-installer.ps1 -Installer dist/Screen-Setup-0.1.0-x64.exe
+```
+
+The installer helper discovers ISCC.exe in standard locations or accepts `-InnoCompiler`. It checks the executable's architecture and refuses to overwrite an existing setup output. The test uses a unique folder under `build/`, installs for the current user, verifies the Start menu and uninstall entry, runs the real app smoke test, reinstalls, and uninstalls. It refuses to run if Screen is already installed or running, and preserves preferences through the app smoke test. Use a clean test profile on Windows on Arm to test the ARM64 installer.
 
 ## Layout
 

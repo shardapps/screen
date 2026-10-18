@@ -1,5 +1,11 @@
 # Changelog
 
+## Preview distribution fix
+
+- Add per-user x64/ARM64 setup EXEs with Start menu shortcuts and Windows uninstall support.
+- Test installation, installed app behavior, reinstall and removal on x64.
+- Separate unsigned MSIX validation artifacts from user downloads; add install instructions and checksums.
+
 ## 0.1.0 — developer preview
 
 - Native Windows 11 overlay dimming with per-display brightness and optional warm tint.

@@ -48,16 +48,35 @@ jobs:
         run: ./scripts/smoke-test.ps1 -Executable build/x64/Release/Screen.exe
       - name: Validate unsigned MSIX
         run: |
-          ./scripts/package.ps1 -Architecture ${{ matrix.arch }} -Executable build/${{ matrix.arch }}/Release/Screen.exe -IdentityName Shardapps.Screen.Preview -Publisher 'CN=Shardapps-Preview'
+          ./scripts/package.ps1 -Architecture ${{ matrix.arch }} -Executable build/${{ matrix.arch }}/Release/Screen.exe -IdentityName Shardapps.Screen.Preview -Publisher 'CN=Shardapps-Preview' -OutputDirectory build/msix-validation
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Screen-msix-validation-${{ matrix.arch }}
+          path: build/msix-validation/*.msix
+          if-no-files-found: error
+          retention-days: 14
       - name: Assemble portable preview
         run: |
           $portable = 'build/portable-${{ matrix.arch }}'
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
           New-Item -ItemType Directory -Path $portable -Force | Out-Null
           Copy-Item build/${{ matrix.arch }}/Release/Screen.exe,LICENSE,README.md -Destination $portable
           foreach ($item in @('docs','PRIVACY.md','SECURITY.md','CONTRIBUTING.md','CODE_OF_CONDUCT.md','CHANGELOG.md')) {
             if (Test-Path -LiteralPath $item) { Copy-Item -LiteralPath $item -Destination $portable -Recurse }
           }
           Compress-Archive -Path "$portable/*" -DestinationPath dist/Screen-portable-${{ matrix.arch }}.zip
+      - name: Build per-user setup EXE
+        run: ./scripts/installer.ps1 -Architecture ${{ matrix.arch }} -Executable build/${{ matrix.arch }}/Release/Screen.exe
+      - name: Test install, launch, upgrade and uninstall
+        if: matrix.arch == 'x64'
+        run: ./scripts/test-installer.ps1 -Installer dist/Screen-Setup-0.1.0-x64.exe
+      - name: Add download instructions and checksums
+        run: |
+          Copy-Item packaging/INSTALL.txt -Destination dist/INSTALL.txt
+          $sums = Get-ChildItem dist -File | ForEach-Object {
+            (Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash.ToLowerInvariant() + '  ' + $_.Name
+          }
+          $sums | Set-Content dist/SHA256SUMS.txt
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: Screen-preview-${{ matrix.arch }}
