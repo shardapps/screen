@@ -5,7 +5,7 @@
 #include <string>
 
 namespace screen {
-inline constexpr int minBrightness = 15;
+inline constexpr int minBrightness = 8;
 inline constexpr int maxBrightness = 100;
 inline constexpr double transitionSeconds = 0.20;
 
@@ -23,6 +23,29 @@ inline double ease(double elapsed) noexcept {
 inline double interpolate(double from, double to, double elapsed) noexcept {
     return from + (to - from) * ease(elapsed);
 }
+// Exact critically damped integration. Retargeting retains velocity rather than
+// restarting an ease-in curve on every mouse event (which can stall a drag).
+struct SmoothValue {
+    double value = 0;
+    double velocity = 0;
+    double target = 0;
+    bool advance(double seconds) noexcept {
+        const auto dt = std::clamp(seconds, 0.0, 1.0);
+        constexpr double omega = 45.0;
+        const auto offset = value - target;
+        const auto momentum = velocity + omega * offset;
+        const auto decay = std::exp(-omega * dt);
+        value = std::clamp(target + (offset + momentum * dt) * decay, 0.0, 235.0);
+        velocity = (velocity - omega * momentum * dt) * decay;
+        if (std::abs(value - target) < 0.25 && std::abs(velocity) < 3.0) {
+            value = target;
+            velocity = 0;
+            return false;
+        }
+        return true;
+    }
+    void snap() noexcept { value = target; velocity = 0; }
+};
 struct Settings {
     int brightness = 70;
     bool paused = true; // First launch is transparent until the user opts in.

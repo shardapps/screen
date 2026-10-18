@@ -2,6 +2,7 @@
 #include "settings.hpp"
 #include <future>
 #include <wtsapi32.h>
+#include <dwmapi.h>
 
 namespace screen {
 namespace {
@@ -37,6 +38,7 @@ std::vector<Monitor> enumerateMonitors() {
     EnumDisplayMonitors(nullptr, nullptr, collectMonitor, reinterpret_cast<LPARAM>(&monitors));
     return monitors;
 }
+thread_local OverlayEngine* OverlayEngine::observer_ = nullptr;
 OverlayEngine::OverlayEngine(HWND owner) : owner_(owner) {
     std::promise<HWND> ready;
     auto future = ready.get_future();
@@ -56,11 +58,23 @@ OverlayEngine::OverlayEngine(HWND owner) : owner_(owner) {
         promise.set_value(window);
         if (!window) return;
         WTSRegisterSessionNotification(window, NOTIFY_FOR_THIS_SESSION);
+        observer_ = this;
+        constexpr DWORD flags = WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS;
+        foregroundHook_ = SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND,
+            nullptr, windowEvent, 0, 0, flags);
+        windowHook_ = SetWinEventHook(EVENT_OBJECT_SHOW, EVENT_OBJECT_REORDER,
+            nullptr, windowEvent, 0, 0, flags);
+        desktopHook_ = SetWinEventHook(EVENT_SYSTEM_DESKTOPSWITCH, EVENT_SYSTEM_DESKTOPSWITCH,
+            nullptr, windowEvent, 0, 0, flags);
+        locationHook_ = SetWinEventHook(EVENT_OBJECT_LOCATIONCHANGE, EVENT_OBJECT_LOCATIONCHANGE,
+            nullptr, windowEvent, 0, 0, flags);
         MSG message{};
         while (GetMessageW(&message, nullptr, 0, 0) > 0) {
             TranslateMessage(&message);
             DispatchMessageW(&message);
         }
+        for (auto hook : {foregroundHook_, windowHook_, desktopHook_, locationHook_}) if (hook) UnhookWinEvent(hook);
+        observer_ = nullptr;
         WTSUnRegisterSessionNotification(window);
     });
     (void)future.get(); // Synchronizes the worker's initialization of control_.
@@ -88,11 +102,14 @@ void OverlayEngine::reportFailure() {
     }
     // Display broadcasts must not revive the last active opacity after an error.
     KillTimer(control_, 1);
+    KillTimer(control_, 3); auditing_ = false;
+    fading_ = false;
     for (const auto& surface : surfaces_) DestroyWindow(surface.window);
     surfaces_.clear();
     PostMessageW(owner_, overlayFailure, 0, 0);
 }
 void OverlayEngine::rebuild() {
+    higherBandWindows_.clear();
     for (const auto& surface : surfaces_) DestroyWindow(surface.window);
     surfaces_.clear();
     for (const auto& monitor : enumerateMonitors()) {
@@ -102,7 +119,7 @@ void OverlayEngine::rebuild() {
             monitor.bounds.right - monitor.bounds.left, monitor.bounds.bottom - monitor.bounds.top,
             nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
         if (!window) { reportFailure(); return; }
-        surfaces_.push_back({window, monitor.device});
+        surfaces_.push_back({window, monitor.device, {}, 0});
         SetWindowLongPtrW(window, GWLP_USERDATA, active_.warm ? 1 : 0);
         if (!SetLayeredWindowAttributes(window, 0, 0, LWA_ALPHA) ||
             !SetWindowPos(window, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)) {
@@ -113,6 +130,7 @@ void OverlayEngine::rebuild() {
 }
 void OverlayEngine::consume() {
     bool persist, refresh;
+    const bool previousWarm = active_.warm;
     {
         const std::lock_guard lock(mutex_);
         active_ = desired_;
@@ -122,37 +140,117 @@ void OverlayEngine::consume() {
         pending_ = false;
     }
     if (refresh || surfaces_.empty()) rebuild();
-    for (const auto& surface : surfaces_) {
-        SetWindowLongPtrW(surface.window, GWLP_USERDATA, active_.warm ? 1 : 0);
-        InvalidateRect(surface.window, nullptr, FALSE);
+    if (previousWarm != active_.warm) {
+        for (const auto& surface : surfaces_) {
+            SetWindowLongPtrW(surface.window, GWLP_USERDATA, active_.warm ? 1 : 0);
+            InvalidateRect(surface.window, nullptr, FALSE);
+        }
     }
     transition();
     if (persist && !saveSettings(active_)) PostMessageW(owner_, settingsFailure, 0, 0);
 }
 void OverlayEngine::transition() {
+    BOOL allowed = TRUE;
+    SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, &allowed, 0);
+    motionAllowed_ = allowed != FALSE;
+    if (fading_ && active_.smooth && motionAllowed_) tick(); // Integrate time before changing a moving target.
     start_ = std::chrono::steady_clock::now();
+    bool needsAudit = false;
     for (auto& surface : surfaces_) {
-        surface.from = surface.current;
-        surface.target = opacity(active_.forMonitor(surface.device), active_.paused || sessionLocked_);
-        if (surface.target > 0 || surface.current > 0) ShowWindow(surface.window, SW_SHOWNOACTIVATE);
+        surface.alpha.target = opacity(active_.forMonitor(surface.device), active_.paused || sessionLocked_);
+        needsAudit = needsAudit || surface.alpha.target > 0;
+        if (surface.alpha.target > 0 || surface.alpha.value > 0) ShowWindow(surface.window, SW_SHOWNOACTIVATE);
     }
+    // Some nonactivating SetWindowPos promotions emit no usable WinEvent.
+    // A cheap 4 Hz audit while dimming covers that gap; paused/100% has no audit.
+    if (needsAudit && !auditing_) auditing_ = SetTimer(control_, 3, 250, nullptr) != 0;
+    else if (!needsAudit) { KillTimer(control_, 3); auditing_ = false; }
     tick();
+    ensureCoverage();
 }
 void OverlayEngine::tick() {
-    const auto elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start_).count();
-    const bool finished = !active_.smooth || elapsed >= transitionSeconds;
+    const auto now = std::chrono::steady_clock::now();
+    const auto elapsed = std::chrono::duration<double>(now - start_).count();
+    start_ = now;
     bool animating = false;
     for (auto& surface : surfaces_) {
-        surface.current = finished ? surface.target : interpolate(surface.from, surface.target, elapsed);
-        if (!SetLayeredWindowAttributes(surface.window, 0, static_cast<BYTE>(std::lround(surface.current)), LWA_ALPHA)) {
-            reportFailure(); return;
+        if (active_.smooth && motionAllowed_) animating = surface.alpha.advance(elapsed) || animating;
+        else surface.alpha.snap();
+        const auto alpha = static_cast<BYTE>(std::lround(surface.alpha.value));
+        if (alpha != surface.applied) {
+            if (!SetLayeredWindowAttributes(surface.window, 0, alpha, LWA_ALPHA)) {
+                reportFailure(); return;
+            }
+            surface.applied = alpha;
         }
-        if (finished && surface.target == 0) ShowWindow(surface.window, SW_HIDE);
-        animating = animating || (!finished && surface.from != surface.target);
+        if (surface.alpha.value == 0 && surface.alpha.target == 0) ShowWindow(surface.window, SW_HIDE);
     }
-    if (animating) {
+    if (animating && !fading_) {
         if (!SetTimer(control_, 1, 15, nullptr)) reportFailure();
-    } else KillTimer(control_, 1);
+        else fading_ = true;
+    } else if (!animating) {
+        KillTimer(control_, 1);
+        fading_ = false;
+    }
+}
+void CALLBACK OverlayEngine::windowEvent(HWINEVENTHOOK, DWORD event, HWND window, LONG object, LONG child, DWORD, DWORD) {
+    auto* self = observer_;
+    if (!self) return;
+    if (event == EVENT_OBJECT_LOCATIONCHANGE &&
+        (!window || (GetWindowLongPtrW(window, GWL_EXSTYLE) & WS_EX_TOPMOST) == 0)) return;
+    // Retry a previously unreachable Windows band only after a genuine change
+    // to that window, not the desktop-reorder notification from our own repair.
+    if (window && window != GetDesktopWindow()) std::erase(self->higherBandWindows_, window);
+    if (event == EVENT_SYSTEM_DESKTOPSWITCH || event == EVENT_SYSTEM_FOREGROUND ||
+        (object == OBJID_WINDOW && child == CHILDID_SELF && window && GetAncestor(window, GA_ROOT) == window))
+        self->queueCoverage();
+}
+void OverlayEngine::queueCoverage() {
+    // A one-shot event debounce; no periodic idle polling or injected input hook.
+    if (active_.paused || sessionLocked_) return;
+    if (!coveragePending_ && SetTimer(control_, 2, 20, nullptr)) coveragePending_ = true;
+}
+void OverlayEngine::ensureCoverage() {
+    if (sessionLocked_ || active_.paused) return;
+    bool surfacesRaised = false;
+    for (const auto& surface : surfaces_) {
+        if (!IsWindow(surface.window)) { rebuild(); transition(); return; }
+        if (surface.alpha.target == 0 && surface.alpha.value == 0) continue;
+        bool raise = (GetWindowLongPtrW(surface.window, GWL_EXSTYLE) & WS_EX_TOPMOST) == 0;
+        HWND candidate = nullptr;
+        RECT bounds{}; GetWindowRect(surface.window, &bounds);
+        // Inspect windows above us before reordering. This also prevents our own
+        // desktop reorder events from producing a perpetual repair loop.
+        auto above = GetWindow(surface.window, GW_HWNDPREV);
+        for (int inspected = 0; above && !raise && inspected < 512; ++inspected,
+             above = GetWindow(above, GW_HWNDPREV)) {
+            DWORD process = 0; GetWindowThreadProcessId(above, &process);
+            if (process == GetCurrentProcessId() || !IsWindowVisible(above)) continue;
+            if (higherBandWindows_.size() >= 512 || std::find(higherBandWindows_.begin(), higherBandWindows_.end(), above) != higherBandWindows_.end()) continue;
+            DWORD cloaked = 0;
+            DwmGetWindowAttribute(above, DWMWA_CLOAKED, &cloaked, sizeof(cloaked));
+            RECT other{}, intersection{}; GetWindowRect(above, &other);
+            if (!cloaked && IntersectRect(&intersection, &bounds, &other)) { raise = true; candidate = above; }
+        }
+        if (raise && !SetWindowPos(surface.window, HWND_TOPMOST, 0, 0, 0, 0,
+                                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)) { reportFailure(); return; }
+        surfacesRaised = surfacesRaised || raise;
+        if (candidate) {
+            auto remaining = GetWindow(surface.window, GW_HWNDPREV);
+            for (int inspected = 0; remaining && inspected < 512; ++inspected,
+                 remaining = GetWindow(remaining, GW_HWNDPREV)) {
+                if (remaining == candidate) {
+                    // Protected/shell bands cannot be overtaken by a normal
+                    // desktop process. Do not fight them with a timer loop.
+                    higherBandWindows_.push_back(candidate); break;
+                }
+            }
+        }
+        if (!IsWindowVisible(surface.window)) ShowWindow(surface.window, SW_SHOWNOACTIVATE);
+    }
+    // Keep the small control panel readable above our own dimming surfaces.
+    if (surfacesRaised && IsWindowVisible(owner_)) SetWindowPos(owner_, HWND_TOPMOST, 0, 0, 0, 0,
+        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
 }
 LRESULT CALLBACK OverlayEngine::procedure(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
     auto* self = reinterpret_cast<OverlayEngine*>(GetWindowLongPtrW(window, GWLP_USERDATA));
@@ -165,17 +263,32 @@ LRESULT CALLBACK OverlayEngine::procedure(HWND window, UINT message, WPARAM wPar
     if (!self) return DefWindowProcW(window, message, wParam, lParam);
     switch (message) {
     case updateMessage: self->consume(); return 0;
-    case WM_TIMER: self->tick(); return 0;
+    case WM_TIMER:
+        if (wParam == 1) self->tick();
+        else if (wParam == 2) {
+            KillTimer(window, 2); self->coveragePending_ = false; self->ensureCoverage();
+        }
+        else if (wParam == 3) self->ensureCoverage();
+        return 0;
     case WM_DISPLAYCHANGE: self->rebuild(); self->transition(); return 0;
+    case WM_SETTINGCHANGE: self->transition(); return 0;
+    case WM_POWERBROADCAST:
+        if (wParam == PBT_APMRESUMEAUTOMATIC || wParam == PBT_APMRESUMESUSPEND) {
+            self->rebuild(); self->transition();
+        }
+        return TRUE;
     case WM_WTSSESSION_CHANGE:
         if (wParam == WTS_SESSION_LOCK) {
             self->sessionLocked_ = true;
             // Lock transitions must restore immediately, regardless of animation preference.
             for (auto& surface : self->surfaces_) {
-                surface.current = surface.from = surface.target = 0;
+                surface.alpha = {}; surface.applied = 0;
+                SetLayeredWindowAttributes(surface.window, 0, 0, LWA_ALPHA);
                 ShowWindow(surface.window, SW_HIDE);
             }
             KillTimer(window, 1);
+            KillTimer(window, 3); self->auditing_ = false;
+            self->fading_ = false;
         } else if (wParam == WTS_SESSION_UNLOCK) {
             self->sessionLocked_ = false;
             self->transition();
@@ -183,6 +296,8 @@ LRESULT CALLBACK OverlayEngine::procedure(HWND window, UINT message, WPARAM wPar
         return 0;
     case WM_CLOSE:
         KillTimer(window, 1);
+        KillTimer(window, 2);
+        KillTimer(window, 3);
         for (const auto& surface : self->surfaces_) DestroyWindow(surface.window);
         self->surfaces_.clear();
         DestroyWindow(window);

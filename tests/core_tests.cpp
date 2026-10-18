@@ -9,8 +9,8 @@ int main() {
     };
     using namespace screen;
     check(opacity(100, false) == 0, "Full brightness must remove the overlay");
-    check(opacity(15, false) == 217, "Maximum dimming must retain 15 percent brightness");
-    check(opacity(-100, false) == 217, "Corrupt values must not black out the display");
+    check(opacity(8, false) == 235, "Deeper dimming must retain the new brightness floor");
+    check(opacity(-100, false) == 235, "Corrupt values must not black out the display");
     check(opacity(50, true) == 0, "Pause must always be transparent");
     check(opacity(500, false) == 0, "Brightness must clamp at 100");
     check(ease(-1) == 0 && ease(1) == 1, "Animation must clamp outside its duration");
@@ -18,6 +18,29 @@ int main() {
     for (int i = 1; i <= 200; ++i)
         check(ease(i / 1000.0) >= ease((i - 1) / 1000.0), "Animation must be monotonic");
     check(interpolate(40, 40, 0.1) == 40, "No movement for equal targets");
+    SmoothValue fade;
+    fade.target = 235;
+    for (int frame = 0; frame < 30; ++frame) {
+        const auto before = fade.value;
+        fade.advance(1.0 / 60.0);
+        check(fade.value >= before && fade.value <= 235, "Single-step fade must be monotonic and bounded");
+    }
+    check(fade.value == 235 && fade.velocity == 0, "Fade must settle and stop");
+    fade = {};
+    for (int input = 1; input <= 100; ++input) {
+        fade.target = input * 2.0;
+        fade.advance(0.002); // Input arrives faster than a frame; motion must not restart.
+    }
+    check(fade.value > 140 && fade.velocity > 0, "Rapid retargeting must keep moving instead of starving animation");
+    fade.target = 0;
+    for (int frame = 0; frame < 120; ++frame) {
+        fade.advance(frame % 2 == 0 ? 0.005 : 0.025);
+        check(fade.value >= 0 && fade.value <= 235, "Reversals must remain safe at uneven frame times");
+    }
+    check(fade.value == 0 && fade.velocity == 0, "Reversed animation must settle exactly");
+    fade.target = 120;
+    fade.snap();
+    check(fade.value == 120 && fade.velocity == 0, "Emergency / reduced-motion changes must snap immediately");
     Settings settings;
     check(settings.paused, "First run must be transparent");
     settings.monitors[L"DISPLAY-A"] = 30;

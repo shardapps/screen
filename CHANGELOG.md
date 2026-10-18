@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.0 — compact controls and reliable dimming
+
+- Replace the large window with a 330 × 136 flyout anchored above the bottom-right taskbar.
+- Add Alt+S to open/hide it, with Ctrl+Alt+S fallback, Escape/outside-click dismissal, dark/light/high-contrast colors and short reduced-motion-aware transitions.
+- Move per-display selection, tint, pause, restore and quit into the tray/context menu.
+- Extend dimming to an 8% floor while retaining immediate emergency restore and transparent startup.
+- Preserve fade velocity through rapid slider changes; avoid repainting unchanged full-screen overlay content or resetting timers every frame.
+- Repair foreground/topmost ordering, lost window handles, display changes and resume events. A lightweight active-only 4 Hz order audit covers silent promotions that emit no usable WinEvent.
+- Add regression tests for actual topmost promotions, repeated slider retargeting, display/resume recovery, compact panel positioning and dismissal.
+
 ## Preview distribution fix
 
 - Add per-user x64/ARM64 setup EXEs with Start menu shortcuts and Windows uninstall support.

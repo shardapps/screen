@@ -19,7 +19,7 @@ Check existing issues and open a focused issue for a substantial feature. Includ
 - Use C++20, RAII, clear ownership, Unicode Windows APIs, and warnings-as-errors.
 - Keep all overlay operations on the worker thread and all UI operations on the UI thread. Shared state must be synchronized.
 - Preserve click-through input, transparent startup, the brightness floor, emergency restore, and fail-open cleanup.
-- Avoid polling, timer-resolution changes, hooks, drivers, elevated privileges, and runtime network calls.
+- Avoid busy polling, timer-resolution changes, injected/input hooks, drivers, elevated privileges, and runtime network calls. Preserve the small active-only coverage audit: silent topmost promotions do not always emit usable window events. Event callbacks must be filtered/coalesced, and the audit must stop while paused or at 100%.
 - Prefer existing Windows APIs over adding a library. Explain any dependency's size, license, security, and performance impact.
 - Add meaningful tests for changed brightness, persistence, lifecycle, or concurrency behavior. Do not add tests that only repeat implementation details.
 - Test keyboard navigation, high DPI, monitor reconnection, and recovery when changing UI or overlay behavior.
