@@ -163,7 +163,10 @@ void OverlayEngine::transition() {
     }
     // Some nonactivating SetWindowPos promotions emit no usable WinEvent.
     // A cheap 4 Hz audit while dimming covers that gap; paused/100% has no audit.
-    if (needsAudit && !auditing_) auditing_ = SetTimer(control_, 3, 250, nullptr) != 0;
+    if (needsAudit && !auditing_) {
+        auditing_ = SetTimer(control_, 3, 250, nullptr) != 0;
+        if (!auditing_) { reportFailure(); return; }
+    }
     else if (!needsAudit) { KillTimer(control_, 3); auditing_ = false; }
     tick();
     ensureCoverage();
@@ -249,8 +252,17 @@ void OverlayEngine::ensureCoverage() {
         if (!IsWindowVisible(surface.window)) ShowWindow(surface.window, SW_SHOWNOACTIVATE);
     }
     // Keep the small control panel readable above our own dimming surfaces.
-    if (surfacesRaised && IsWindowVisible(owner_)) SetWindowPos(owner_, HWND_TOPMOST, 0, 0, 0, 0,
-        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
+    if (IsWindowVisible(owner_)) {
+        bool panelCovered = surfacesRaised;
+        auto above = GetWindow(owner_, GW_HWNDPREV);
+        for (int inspected = 0; above && !panelCovered && inspected < 512; ++inspected,
+             above = GetWindow(above, GW_HWNDPREV)) {
+            panelCovered = std::any_of(surfaces_.begin(), surfaces_.end(),
+                [&](const auto& surface) { return surface.window == above; });
+        }
+        if (panelCovered) SetWindowPos(owner_, HWND_TOPMOST, 0, 0, 0, 0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
+    }
 }
 LRESULT CALLBACK OverlayEngine::procedure(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
     auto* self = reinterpret_cast<OverlayEngine*>(GetWindowLongPtrW(window, GWLP_USERDATA));

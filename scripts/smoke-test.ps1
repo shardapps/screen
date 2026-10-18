@@ -132,12 +132,18 @@ try {
         Start-Sleep -Milliseconds 2
     }
     Set-Level 60; Start-Sleep -Milliseconds 400; Assert-Alpha 102
-    [void][ScreenSmoke]::SendMessage($window, 0x0312, [IntPtr]4, [IntPtr]0)
-    Start-Sleep -Milliseconds 100; Assert-Alpha 0
     # Open the new mini panel, verify bounded dimensions and work-area anchoring.
     [void][ScreenSmoke]::SendMessage($window, 0x0312, [IntPtr]5, [IntPtr]0)
     Start-Sleep -Milliseconds 250
     if (-not [ScreenSmoke]::IsWindowVisible($window)) { throw 'Open shortcut did not show the flyout.' }
+    # The dimmer must not bury its own readable controls when a surface is shown/raised.
+    foreach ($surface in $script:surfaces) {
+        [void][ScreenSmoke]::SetWindowPos($surface, [IntPtr](-1), 0, 0, 0, 0, 0x0013)
+    }
+    Start-Sleep -Milliseconds 400
+    foreach ($surface in $script:surfaces) { Assert-Above $window $surface }
+    [void][ScreenSmoke]::SendMessage($window, 0x0312, [IntPtr]4, [IntPtr]0)
+    Start-Sleep -Milliseconds 100; Assert-Alpha 0
     $bounds = [ScreenSmoke+Rect]::new(); [void][ScreenSmoke]::GetWindowRect($window, [ref]$bounds)
     $scale = [ScreenSmoke]::GetDpiForWindow($window) / 96.0
     if (($bounds.Right-$bounds.Left) -gt 340*$scale -or ($bounds.Bottom-$bounds.Top) -gt 150*$scale) { throw 'Flyout is not compact.' }
