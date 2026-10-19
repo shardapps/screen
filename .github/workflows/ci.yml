@@ -51,7 +51,10 @@ jobs:
         run: ./scripts/desktop-test.ps1 -Executable build/x64/Release/Screen.exe
       - name: Check settings, themes, startup and UI resource lifetime
         if: matrix.arch == 'x64'
-        run: ./scripts/settings-test.ps1 -Executable build/x64/Release/Screen.exe -CaptureDirectory build/store-screenshots -StoreScreenshots
+        run: |
+          # The disposable hosted desktop defaults to 1024x768, below Store screenshot requirements.
+          Set-DisplayResolution -Width 1920 -Height 1080 -Force
+          ./scripts/settings-test.ps1 -Executable build/x64/Release/Screen.exe -CaptureDirectory build/store-screenshots -StoreScreenshots
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: matrix.arch == 'x64'
         with:

@@ -117,7 +117,7 @@ function Capture([string]$name){
   }
  }finally{$graphics.ReleaseHdc($dc);$graphics.Dispose()}
  try{
-  if($StoreScreenshots -and ($bitmap.Width -lt 1366 -or $bitmap.Height -lt 768)){throw 'Store screenshot is too small'}
+  if($StoreScreenshots -and ($bitmap.Width -lt 1366 -or $bitmap.Height -lt 768)){throw "Store screenshot is too small: $($bitmap.Width)x$($bitmap.Height)"}
   $colors=[Collections.Generic.HashSet[int]]::new()
   for($y=0;$y -lt $bitmap.Height;$y+=17){for($x=0;$x -lt $bitmap.Width;$x+=17){[void]$colors.Add($bitmap.GetPixel($x,$y).ToArgb())}}
   if($colors.Count -lt 12){throw "Capture appears blank: $name ($($colors.Count) colors)"}
