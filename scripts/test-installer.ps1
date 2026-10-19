@@ -7,7 +7,12 @@ if (Test-Path -LiteralPath $appKey) { throw 'Screen is already installed. Use a 
 if (Get-Process Screen -ErrorAction SilentlyContinue) { throw 'Close Screen before running installer tests.' }
 $startupKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
 $startupName = 'ScreenByShardapps'
-if ($null -ne (Get-ItemPropertyValue -LiteralPath $startupKey -Name $startupName -ErrorAction SilentlyContinue)) {
+function Read-StartupRegistration {
+    $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Software\Microsoft\Windows\CurrentVersion\Run')
+    try { if ($key) { return $key.GetValue($startupName, $null) } } finally { if ($key) { $key.Dispose() } }
+    return $null
+}
+if ($null -ne (Read-StartupRegistration)) {
     throw 'Screen startup is already registered. Use a clean user profile for installer tests.'
 }
 $projectRoot = Split-Path -Parent $PSScriptRoot
@@ -48,5 +53,5 @@ try {
 if (Test-Path -LiteralPath (Join-Path $installRoot 'Screen.exe')) { throw 'Uninstall left the executable behind.' }
 if (Test-Path -LiteralPath $shortcut) { throw 'Uninstall left the Start menu shortcut behind.' }
 if (Test-Path -LiteralPath $appKey) { throw 'Uninstall left the per-user app registration behind.' }
-if ($null -ne (Get-ItemPropertyValue -LiteralPath $startupKey -Name $startupName -ErrorAction SilentlyContinue)) { throw 'Uninstall left its startup registration behind.' }
+if ($null -ne (Read-StartupRegistration)) { throw 'Uninstall left its startup registration behind.' }
 Write-Output 'PASS: per-user installation, Start menu shortcut, uninstall registration, installed app behavior, reinstall, startup cleanup and removal.'
