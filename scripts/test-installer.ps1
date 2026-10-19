@@ -5,6 +5,11 @@ $setup = (Resolve-Path -LiteralPath $Installer).Path
 $appKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{A373290A-4074-4C94-8C9E-F8844D3EE424}_is1'
 if (Test-Path -LiteralPath $appKey) { throw 'Screen is already installed. Use a clean user profile for installer tests.' }
 if (Get-Process Screen -ErrorAction SilentlyContinue) { throw 'Close Screen before running installer tests.' }
+$startupKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+$startupName = 'ScreenByShardapps'
+if ($null -ne (Get-ItemPropertyValue -LiteralPath $startupKey -Name $startupName -ErrorAction SilentlyContinue)) {
+    throw 'Screen startup is already registered. Use a clean user profile for installer tests.'
+}
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $testId = [guid]::NewGuid().ToString('N')
 $installRoot = Join-Path $projectRoot "build\installer-test-$testId"
@@ -30,6 +35,9 @@ try {
     & (Join-Path $PSScriptRoot 'settings-test.ps1') -Executable $installedExe
     # Reinstall exercises the same-identity upgrade path without creating another app entry.
     Invoke-Setup
+    # Exercise the real UninstallRun hook with a registration owned by this install.
+    if (-not (Test-Path -LiteralPath $startupKey)) { New-Item -Path $startupKey -Force | Out-Null }
+    New-ItemProperty -LiteralPath $startupKey -Name $startupName -PropertyType String -Value ('"' + $installedExe + '" --background --startup') -Force | Out-Null
 } finally {
     if (Test-Path -LiteralPath $uninstaller) {
         $uninstall = Start-Process -FilePath $uninstaller -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -WindowStyle Hidden -PassThru
@@ -40,4 +48,5 @@ try {
 if (Test-Path -LiteralPath (Join-Path $installRoot 'Screen.exe')) { throw 'Uninstall left the executable behind.' }
 if (Test-Path -LiteralPath $shortcut) { throw 'Uninstall left the Start menu shortcut behind.' }
 if (Test-Path -LiteralPath $appKey) { throw 'Uninstall left the per-user app registration behind.' }
-Write-Output 'PASS: per-user installation, Start menu shortcut, uninstall registration, installed app behavior, reinstall and removal.'
+if ($null -ne (Get-ItemPropertyValue -LiteralPath $startupKey -Name $startupName -ErrorAction SilentlyContinue)) { throw 'Uninstall left its startup registration behind.' }
+Write-Output 'PASS: per-user installation, Start menu shortcut, uninstall registration, installed app behavior, reinstall, startup cleanup and removal.'
