@@ -1,12 +1,12 @@
 # Privacy policy — Screen by Shardapps
 
-Effective date: October 18, 2026. Applies to the source and v0.3.0 developer preview in this repository.
+Effective date: October 19, 2026. Applies to the source and v0.4.0 developer preview in this repository.
 
 Screen does not collect, transmit, sell, or share personal data. It has no account system, telemetry, advertising, analytics SDK, network client, screenshot capture, or keystroke recording.
 
 ## Local data
 
-Screen saves brightness, per-display brightness overrides, warm tint, and smooth-transition preferences in a local settings file. Portable builds use `%LOCALAPPDATA%\Shardapps\Screen\settings.ini`; Windows may virtualize this location in an MSIX installation. Per-display overrides contain Windows display device names, not monitor serial numbers. Each launch starts paused.
+Screen saves brightness, per-display brightness overrides, selected display, theme, warm tint, smooth transitions, adjustment step, opening shortcut and opt-in resume preferences in a local settings file. Portable builds use `%LOCALAPPDATA%\Shardapps\Screen\settings.ini`; Windows may virtualize this location in an MSIX installation. Per-display overrides contain Windows display device names, not monitor serial numbers. Each launch starts paused unless you explicitly enable resuming saved dimming. Startup is off by default. For a setup/portable installation, enabling startup writes only the ScreenByShardapps value under your own Windows Run registry key, containing the quoted executable path and background launch arguments. Packaged builds use the Windows StartupTask API. These preferences and registrations remain local; Windows startup settings may override them.
 
 The app reads display geometry to position overlays and receives Windows display/session and window-change notifications. It inspects local window handles, process IDs, bounds, visibility and stacking order to maintain coverage; it does not read or log other apps' titles or contents. It registers the documented global shortcuts without installing a keyboard hook or injecting code into other apps. This state is processed locally.
 

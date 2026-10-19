@@ -36,3 +36,9 @@ Developer preview builds are not a substitute for this release gate. Record the 
 - [ ] Review Store listing copy, categories, age rating, privacy URL, contact channel, screenshots and certification notes.
 - [ ] Release PRs are reviewed and merged by a maintainer; signed release/submission receives explicit approval.
 - [ ] Update README/CHANGELOG with real download links and actual Store status only after publication.
+
+## Settings and startup
+
+- [ ] Verify all six palettes, System/high contrast, keyboard navigation and 100–200% DPI on short work areas.
+- [ ] Verify startup opt-in/out, real sign-in activation, Windows user-disabled/policy states, setup uninstall cleanup, and packaged StartupTask behavior.
+- [ ] Verify separate saved-dimming resume and --paused recovery override; check shortcut conflicts and display reconnection.

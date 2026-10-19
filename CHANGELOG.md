@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0 — 2026-10-19
+
+- Add on-demand Displays, Appearance and Preferences settings, plus a direct flyout screen picker.
+- Add six palettes (Pearl, Midnight, Graphite, Ocean, Forest, Sunset), System following Windows, and high-contrast priority.
+- Add screen identification, brightness presets, a 15-minute pause, configurable adjustment steps and opening shortcut.
+- Add opt-in quiet Windows startup with separate saved-dimming resume; matching-path uninstall cleanup and MSIX StartupTask support.
+- Share the buffered native slider renderer, release settings resources on close, and keep transitions short with no idle UI timer.
+- Retry transient atomic preference-file replacement conflicts on the worker; add settings/startup/resource-lifetime regression checks to CI.
+
 ## 0.3.0 — desktop dimming for full-screen apps
 
 - Use Windows' full-screen color transform for uniform brightness across all displays, avoiding the window-order limitation of a black overlay over full-screen app surfaces.

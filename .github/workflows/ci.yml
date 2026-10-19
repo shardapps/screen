@@ -49,6 +49,9 @@ jobs:
       - name: Check full-desktop dimming and cleanup
         if: matrix.arch == 'x64'
         run: ./scripts/desktop-test.ps1 -Executable build/x64/Release/Screen.exe
+      - name: Check settings, themes, startup and UI resource lifetime
+        if: matrix.arch == 'x64'
+        run: ./scripts/settings-test.ps1 -Executable build/x64/Release/Screen.exe
       - name: Validate unsigned MSIX
         run: |
           ./scripts/package.ps1 -Architecture ${{ matrix.arch }} -Executable build/${{ matrix.arch }}/Release/Screen.exe -IdentityName Shardapps.Screen.Preview -Publisher 'CN=Shardapps-Preview' -OutputDirectory build/msix-validation
@@ -72,7 +75,7 @@ jobs:
         run: ./scripts/installer.ps1 -Architecture ${{ matrix.arch }} -Executable build/${{ matrix.arch }}/Release/Screen.exe
       - name: Test install, launch, upgrade and uninstall
         if: matrix.arch == 'x64'
-        run: ./scripts/test-installer.ps1 -Installer dist/Screen-Setup-0.3.0-x64.exe
+        run: ./scripts/test-installer.ps1 -Installer dist/Screen-Setup-0.4.0-x64.exe
       - name: Add download instructions and checksums
         run: |
           Copy-Item packaging/INSTALL.txt -Destination dist/INSTALL.txt

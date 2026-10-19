@@ -85,11 +85,12 @@ OverlayEngine::~OverlayEngine() {
     if (control_) PostMessageW(control_, WM_CLOSE, 0, 0);
     if (thread_.joinable()) thread_.join();
 }
-void OverlayEngine::submit(const Settings& settings, bool persist, bool rebuildRequested) {
+void OverlayEngine::submit(const Settings& settings, bool persist, bool rebuildRequested, bool immediate) {
     if (!control_) return;
     {
         const std::lock_guard lock(mutex_);
         desired_ = settings;
+        immediate_ = immediate;
         persist_ = persist_ || persist;
         rebuild_ = rebuild_ || rebuildRequested;
     }
@@ -132,7 +133,7 @@ void OverlayEngine::rebuild() {
     }
 }
 void OverlayEngine::consume() {
-    bool persist, refresh;
+    bool persist, refresh, immediate;
     const bool previousWarm = active_.warm;
     {
         const std::lock_guard lock(mutex_);
@@ -140,6 +141,7 @@ void OverlayEngine::consume() {
         desktopBlocked_ = false; // Retry the desktop API on a new user adjustment.
         persist = persist_;
         refresh = rebuild_;
+        immediate = immediate_;
         persist_ = rebuild_ = false;
         pending_ = false;
     }
@@ -150,7 +152,10 @@ void OverlayEngine::consume() {
             InvalidateRect(surface.window, nullptr, FALSE);
         }
     }
+    const auto smooth = active_.smooth;
+    if (immediate) active_.smooth = false;
     transition();
+    active_.smooth = smooth; // Emergency restore must not overwrite the saved animation preference.
     if (persist && !saveSettings(active_)) PostMessageW(owner_, settingsFailure, 0, 0);
 }
 void OverlayEngine::transition() {
