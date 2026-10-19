@@ -27,4 +27,4 @@ jobs:
           build-mode: manual
       - run: ./scripts/configure.ps1 -Architecture x64 -BuildDirectory build/codeql
       - run: cmake --build build/codeql --config Release --parallel
-      - uses: github/codeql-action/analyze@f051dc808ef3645eb0d08647ec751634ec2304ac # v4
+      - uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4
