@@ -172,10 +172,15 @@ try{
  if($afterScroll.Top -ge $beforeScroll.Top){throw 'Short settings window did not scroll'}
  # UI resources must be released when settings closes, with no growth per open.
  Send $preferences 0x0010
+ # Native controls/theme services can allocate process caches on early opens.
+ # Warm them before measuring repeated lifetime growth, and retain every sample.
+ foreach($iteration in 1..3){Open-Settings;Send $preferences 0x0010}
  $baseline=[PreferencesTest]::GetGuiResources($process.Handle,0)
- foreach($iteration in 1..8){Open-Settings;Send $preferences 0x0010}
+ $gdiSamples=@($baseline)
+ foreach($iteration in 1..8){Open-Settings;Send $preferences 0x0010;$gdiSamples += [PreferencesTest]::GetGuiResources($process.Handle,0)}
  $after=[PreferencesTest]::GetGuiResources($process.Handle,0)
- if($after -gt $baseline+3){throw "Settings leaked GDI objects: $baseline -> $after"}
+ Write-Output "Closed-settings GDI samples after warmup: $($gdiSamples -join ', ')"
+ if($after -gt $baseline+2){throw "Settings leaked GDI objects: $baseline -> $after"}
  # Explicit opt-in resume persists; --paused remains a recovery override.
  Open-Settings;Send $preferences 0x0111 1000
  $level=[PreferencesTest]::GetDlgItem($preferences,1011);Send $level 0x0405 1 99;Send $preferences 0x0114 8 $level;Wait-SettingsFile 'brightness=99'
