@@ -17,6 +17,7 @@ public static class PreferencesTest {
  [DllImport("user32.dll")]public static extern bool EnumWindows(EnumProc callback,IntPtr data);
  [DllImport("user32.dll")]public static extern bool GetWindowRect(IntPtr hwnd,out Rect rect);
  [DllImport("user32.dll")]public static extern bool IsWindowVisible(IntPtr hwnd);
+ [DllImport("user32.dll")]public static extern bool ShowWindow(IntPtr hwnd,int command);
  [DllImport("user32.dll")]public static extern bool IsWindow(IntPtr hwnd);
  [DllImport("user32.dll")]public static extern bool IsWindowEnabled(IntPtr hwnd);
  [DllImport("user32.dll")]public static extern bool SetWindowPos(IntPtr hwnd,IntPtr after,int x,int y,int w,int h,uint flags);
@@ -103,6 +104,9 @@ function Isolate-Overlays {
 function Capture([string]$name){
  if(-not $CaptureDirectory){return}
  [void][IO.Directory]::CreateDirectory($CaptureDirectory)
+ # Start-Process hides the first ShowWindow call; explicitly show the capture target.
+ [void][PreferencesTest]::ShowWindow($preferences,4)
+ if(-not [PreferencesTest]::IsWindowVisible($preferences)){throw 'Settings capture target is hidden'}
  Start-Sleep -Milliseconds 200
  [void][PreferencesTest]::RedrawWindow($preferences,[IntPtr]::Zero,[IntPtr]::Zero,0x0585)
  [void][PreferencesTest]::DwmFlush()
