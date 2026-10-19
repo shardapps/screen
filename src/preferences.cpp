@@ -34,11 +34,11 @@ void PreferencesWindow::show(HWND owner) {
     RegisterClassExW(&type);
     dpi_ = GetDpiForWindow(owner);
     MONITORINFO info{sizeof(info)}; GetMonitorInfoW(MonitorFromWindow(owner, MONITOR_DEFAULTTONEAREST), &info);
-    constexpr DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_THICKFRAME | WS_CLIPCHILDREN | WS_VSCROLL;
+    constexpr DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME | WS_CLIPCHILDREN | WS_VSCROLL;
     RECT rect{0,0,px(520),px(640)}; AdjustWindowRectExForDpi(&rect, style, FALSE, WS_EX_APPWINDOW, dpi_);
     const auto width = std::min<LONG>(rect.right-rect.left, info.rcWork.right-info.rcWork.left);
     const auto height = std::min<LONG>(rect.bottom-rect.top, info.rcWork.bottom-info.rcWork.top);
-    window_ = CreateWindowExW(WS_EX_APPWINDOW, preferencesClass, L"Screen settings", style,
+    window_ = CreateWindowExW(WS_EX_APPWINDOW, preferencesClass, L"Screen Dimmer settings", style,
         info.rcWork.left+(info.rcWork.right-info.rcWork.left-width)/2,
         info.rcWork.top+(info.rcWork.bottom-info.rcWork.top-height)/2, width, height,
         nullptr, nullptr, type.hInstance, this);
@@ -320,7 +320,7 @@ LRESULT PreferencesWindow::customDraw(NMCUSTOMDRAW& draw) {
 void PreferencesWindow::paint(HDC dc) {
     RECT rect{}; GetClientRect(window_,&rect); FillRect(dc,&rect,background_);
     const auto previous=SelectObject(dc,titleFont_);
-    ui::text(dc,{px(24),px(20-scroll_),rect.right-px(24),px(56-scroll_)},L"Screen settings",colors_.fg);
+    ui::text(dc,{px(24),px(20-scroll_),rect.right-px(24),px(56-scroll_)},L"Screen Dimmer settings",colors_.fg);
     SelectObject(dc,smallFont_);
     ui::text(dc,{px(24),px(60-scroll_),rect.right-px(24),px(82-scroll_)},L"Your screens. Your comfort. Everything stays local.",colors_.muted);
     SelectObject(dc,previous);

@@ -3,7 +3,7 @@
   #error AppBinary must point to a built Screen.exe
 #endif
 #ifndef AppVersion
-  #define AppVersion "0.4.0"
+  #define AppVersion "1.0.0"
 #endif
 #ifndef TargetArchitecture
   #error TargetArchitecture must be x64 or arm64
@@ -11,7 +11,7 @@
 
 [Setup]
 AppId={{A373290A-4074-4C94-8C9E-F8844D3EE424}
-AppName=Screen by Shardapps
+AppName=Screen Dimmer by Shardapps
 AppVersion={#AppVersion}
 AppPublisher=Shardapps
 AppPublisherURL=https://github.com/shardapps/screen
@@ -39,7 +39,7 @@ OutputBaseFilename=Screen-Setup-{#AppVersion}-{#TargetArchitecture}
 Compression=lzma2/fast
 SolidCompression=yes
 WizardStyle=modern
-VersionInfoDescription=Screen by Shardapps Setup
+VersionInfoDescription=Screen Dimmer by Shardapps Setup
 VersionInfoVersion={#AppVersion}.0
 SignedUninstaller=no
 
@@ -56,8 +56,8 @@ Source: "..\*.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\docs\*"; DestDir: "{app}\docs"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\Screen by Shardapps"; Filename: "{app}\Screen.exe"; WorkingDir: "{app}"
-Name: "{autodesktop}\Screen by Shardapps"; Filename: "{app}\Screen.exe"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{group}\Screen Dimmer by Shardapps"; Filename: "{app}\Screen.exe"; WorkingDir: "{app}"
+Name: "{autodesktop}\Screen Dimmer by Shardapps"; Filename: "{app}\Screen.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\Screen.exe"; Description: "Open Screen"; Flags: nowait postinstall skipifsilent

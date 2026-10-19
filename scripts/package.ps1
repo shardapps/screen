@@ -4,7 +4,8 @@ param(
     [Parameter(Mandatory)][string]$Executable,
     [Parameter(Mandatory)][ValidatePattern('^[A-Za-z0-9.-]{3,50}$')][string]$IdentityName,
     [Parameter(Mandatory)][string]$Publisher,
-    [ValidatePattern('^\d+\.\d+\.\d+\.0$')][string]$Version = '0.4.0.0',
+    [string]$PublisherDisplayName = 'Shardapps',
+    [ValidatePattern('^\d+\.\d+\.\d+\.0$')][string]$Version = '1.0.0.0',
     [string]$OutputDirectory = 'dist'
 )
 $ErrorActionPreference = 'Stop'
@@ -41,6 +42,7 @@ $manifest.Package.Identity.Name = $IdentityName
 $manifest.Package.Identity.Publisher = $Publisher
 $manifest.Package.Identity.Version = $Version
 $manifest.Package.Identity.ProcessorArchitecture = $Architecture
+$manifest.Package.Properties.PublisherDisplayName = $PublisherDisplayName
 $manifest.Save((Join-Path $stage 'AppxManifest.xml'))
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 $outputRoot = (Resolve-Path -LiteralPath $OutputDirectory).Path

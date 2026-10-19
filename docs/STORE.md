@@ -15,9 +15,20 @@ For a normal local installation, use the setup EXE described in [installation he
 
 For ARM64, pass `-Architecture arm64` and its ARM64 executable. The script requires Windows SDK MakeAppx, creates a fresh staging folder under ignored `build/`, copies the executable/license/assets, updates manifest attributes through an XML DOM, and calls MakeAppx with schema validation enabled. It refuses to overwrite an existing output. Clean only the specific ignored staging/output folders you no longer need.
 
-## Use the real Shardapps identity
+## Use the reserved Store identity
 
-Reserve an app in the Shardapps Partner Center account. Copy its exact package identity name and publisher certificate subject from Product identity. Do not infer them from the brand name. Run the script with these explicit values and a monotonically increasing four-part Store version whose first component is at least 1 and whose final component is zero, such as `-Version 1.0.0.0`. The default `0.4.0.0` is for developer preview validation, not Store submission. Update the executable/project versions together for the release.
+The public reserved identity is recorded in `packaging/store-identity.json`. The Store name is **Screen Dimmer by Shardapps** and the registered publisher display name is **ShardCoders**. CI builds x64 and ARM64 Store packages using these exact values, separately from preview packages. No signing key or account credential belongs in this file.
+
+```powershell
+$identity = Get-Content packaging/store-identity.json -Raw | ConvertFrom-Json
+./scripts/package.ps1 -Architecture x64 `
+  -Executable build/x64/Release/Screen.exe `
+  -IdentityName $identity.identityName -Publisher $identity.publisher `
+  -PublisherDisplayName $identity.publisherDisplayName -Version $identity.version `
+  -OutputDirectory build/store-alpha
+```
+
+Increase the four-part Store version monotonically and keep its final component zero. The first Store alpha is version `1.0.0.0`; update executable and project versions together. Store listing text is in `docs/store/listing.en-US.json`. CI captures actual native settings windows for Desktop screenshots; promotional artwork is kept separate.
 
 The manifest targets `Windows.Desktop` starting at Windows 11 build 22000. It declares `runFullTrust` for its Win32 entry point, not elevation. Explain the full-desktop Magnification color effect, the per-display click-through overlay fallback, restoration behavior, and lack of driver/kernel access in certification notes. Screen does not change zoom or input transforms.
 
@@ -31,4 +42,4 @@ See Microsoft's [manual packaging guidance](https://learn.microsoft.com/en-us/wi
 - Run Windows App Certification Kit, test install/update/uninstall, inspect capabilities, and complete [release QA](RELEASE_CHECKLIST.md) before submitting.
 - Publish the reviewed privacy policy to a stable public URL and include it in the listing. Screenshots must show the actual app; the README hero is labeled artwork, not a certification screenshot.
 
-The initial implementation does not include startup tasks, elevation, a service, drivers, or automatic updating. MSIX/Store distribution can provide managed updates after publication.
+The app includes an opt-in StartupTask, with no elevation, service, drivers or independent updater. MSIX/Store distribution can provide managed updates after publication.

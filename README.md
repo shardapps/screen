@@ -1,6 +1,6 @@
 <div align="center">
 
-![Screen by Shardapps — lightweight Windows 11 screen dimmer](docs/assets/hero.svg)
+![Screen Dimmer by Shardapps — lightweight Windows 11 screen dimmer](docs/assets/hero.svg)
 
 # Screen — a lightweight screen dimmer for Windows 11
 
@@ -20,7 +20,7 @@ Software brightness control across your desktop, with smooth fades, per-monitor 
 
 Screen by **Shardapps** dims Windows desktop output using a full-desktop color transform, with click-through overlays for separate per-display levels and compatibility. Lower the slider to reduce perceived brightness across apps, including ordinary full-screen video app layers. It works independently of a monitor's brightness API and does not change hardware backlight settings.
 
-**Status: developer preview, v0.4.0.** CI produces per-user setup EXEs and portable ZIPs. Unsigned MSIX files are separate packaging-validation artifacts, not normal installers. Microsoft Store publication and certification are pending; there is no Store listing yet.
+**Status: Alpha 1 (v1.0.0), being prepared for Microsoft Store certification.** The name **Screen Dimmer by Shardapps** is reserved under the registered publisher **ShardCoders**. CI produces per-user setup EXEs, portable ZIPs and Store packages. Unsigned MSIX files require Store signing and are not normal local installers. The Store submission is a draft; public availability will follow certification.
 
 ## Built to stay out of your way
 
@@ -58,7 +58,7 @@ The compact flyout at 150% display scaling. The hero above is an interface illus
 
 1. Open a successful [Windows CI run](https://github.com/shardapps/screen/actions/workflows/ci.yml). GitHub requires sign-in to download workflow artifacts.
 2. Download `Screen-preview-x64` for an Intel/AMD PC, or `Screen-preview-arm64` for Windows on Arm, and extract the artifact ZIP.
-3. Quit any older Screen copy from its tray menu, then run **`Screen-Setup-0.4.0-x64.exe`** (or ARM64 setup). It updates the existing per-user installation, adds a Start menu shortcut, and supports uninstall through **Settings → Apps**. Alternatively, extract the portable ZIP completely and run `Screen.exe`. These previews are unsigned; Windows may show an unknown publisher/SmartScreen warning, and managed policies may block them. Review the source/build before running them.
+3. Quit any older Screen copy from its tray menu, then run **`Screen-Setup-1.0.0-x64.exe`** (or ARM64 setup). It updates the existing per-user installation, adds a Start menu shortcut, and supports uninstall through **Settings → Apps**. Alternatively, extract the portable ZIP completely and run `Screen.exe`. These previews are unsigned; Windows may show an unknown publisher/SmartScreen warning, and managed policies may block them. Review the source/build before running them.
 4. Move the slider to enable dimming. Screen starts paused by default. Click the settings icon for **Displays**, **Appearance**, and **Preferences**. Choose a screen directly from the flyout footer or in settings. Your selection and preferences are retained.
 
 Alt+S toggles the flyout. Click outside it or press Escape to dismiss it while dimming continues. Choose **Quit** in the tray menu to stop Screen and restore the desktop. `Screen.exe --background` starts quietly in the tray. Enable **Start with Windows** in Preferences to launch at sign-in. **Resume saved dimming when Screen opens** is a separate opt-in; `Screen.exe --paused` overrides it for recovery. Choose Alt+S, Ctrl+Alt+S or Ctrl+Shift+S as the opening shortcut.

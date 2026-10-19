@@ -1,6 +1,6 @@
-# Privacy policy — Screen by Shardapps
+# Privacy policy — Screen Dimmer by Shardapps
 
-Effective date: October 19, 2026. Applies to the source and v0.4.0 developer preview in this repository.
+Effective date: October 19, 2026. Applies to the source and v1.0.0 alpha in this repository.
 
 Screen does not collect, transmit, sell, or share personal data. It has no account system, telemetry, advertising, analytics SDK, network client, screenshot capture, or keystroke recording.
 
@@ -14,7 +14,7 @@ Close Screen and delete its settings file to reset or remove preferences. Removi
 
 ## Third-party services and reports
 
-GitHub hosts the repository, issues, workflow artifacts, and downloads under GitHub's own terms and privacy policy. A future Microsoft Store distribution would also be subject to Microsoft's terms and applicable diagnostics. These services are separate from Screen's application behavior.
+GitHub hosts the repository, issues, workflow artifacts, and downloads under GitHub's own terms and privacy policy. Microsoft Store distribution is also subject to Microsoft's terms and applicable diagnostics. These services are separate from Screen's application behavior.
 
 If you choose to submit an issue, screenshot, diagnostic result, or benchmark, it is shared through the service you use. Remove personal information before posting. Screen does not submit reports automatically.
 

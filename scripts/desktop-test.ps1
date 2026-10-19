@@ -27,7 +27,7 @@ public static class DesktopTest {
 }
 '@
 $binary=(Resolve-Path -LiteralPath $Executable).Path
-if([DesktopTest]::FindWindow('Shardapps.Screen.Control','Screen by Shardapps') -ne [IntPtr]::Zero){throw 'Close Screen before the isolated desktop test.'}
+if([DesktopTest]::FindWindow('Shardapps.Screen.Control','Screen Dimmer by Shardapps') -ne [IntPtr]::Zero){throw 'Close Screen before the isolated desktop test.'}
 if(-not [DesktopTest]::MagInitialize()){Write-Output 'SKIP: desktop color API unavailable in this session; the separate overlay test validates compatibility rendering.';return}
 $original=[DesktopTest+Effect]::new()
 if(-not [DesktopTest]::MagGetFullscreenColorEffect([ref]$original)){
@@ -64,7 +64,7 @@ function Start-Screen {
  $script:window=[IntPtr]::Zero
  for($attempt=0;$attempt -lt 100 -and $script:window -eq [IntPtr]::Zero;$attempt++){
   Start-Sleep -Milliseconds 50
-  $script:window=[DesktopTest]::FindWindow('Shardapps.Screen.Control','Screen by Shardapps')
+  $script:window=[DesktopTest]::FindWindow('Shardapps.Screen.Control','Screen Dimmer by Shardapps')
   if($script:process.HasExited){throw 'Screen exited at startup'}
  }
  if($script:window -eq [IntPtr]::Zero){throw 'Missing Screen control window'}
