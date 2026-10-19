@@ -4,7 +4,7 @@ param(
     [Parameter(Mandatory)][string]$Executable,
     [Parameter(Mandatory)][ValidatePattern('^[A-Za-z0-9.-]{3,50}$')][string]$IdentityName,
     [Parameter(Mandatory)][string]$Publisher,
-    [ValidatePattern('^\d+\.\d+\.\d+\.0$')][string]$Version = '0.3.0.0',
+    [ValidatePattern('^\d+\.\d+\.\d+\.0$')][string]$Version = '0.4.0.0',
     [string]$OutputDirectory = 'dist'
 )
 $ErrorActionPreference = 'Stop'
@@ -33,6 +33,7 @@ if (-not $sdk) { throw 'Install the Windows 11 SDK with MakeAppx.' }
 $stage = Join-Path $projectRoot ('build\package-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $stage -Force | Out-Null
 Copy-Item -LiteralPath $binary -Destination (Join-Path $stage 'Screen.exe')
+Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $binary) 'ScreenStartup.exe') -Destination (Join-Path $stage 'ScreenStartup.exe')
 Copy-Item -LiteralPath (Join-Path $projectRoot 'packaging\Assets') -Destination $stage -Recurse
 Copy-Item -LiteralPath (Join-Path $projectRoot 'LICENSE') -Destination $stage
 [xml]$manifest = Get-Content -LiteralPath (Join-Path $projectRoot 'packaging\AppxManifest.xml') -Raw

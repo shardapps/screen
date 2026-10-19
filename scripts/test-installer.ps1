@@ -27,6 +27,7 @@ try {
     if ($shell.CreateShortcut($shortcut).TargetPath -ne $installedExe) { throw 'Start menu target is incorrect.' }
     & (Join-Path $PSScriptRoot 'smoke-test.ps1') -Executable $installedExe
     & (Join-Path $PSScriptRoot 'desktop-test.ps1') -Executable $installedExe
+    & (Join-Path $PSScriptRoot 'settings-test.ps1') -Executable $installedExe
     # Reinstall exercises the same-identity upgrade path without creating another app entry.
     Invoke-Setup
 } finally {

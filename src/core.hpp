@@ -51,6 +51,11 @@ struct Settings {
     bool paused = true; // First launch is transparent until the user opts in.
     bool warm = false;
     bool smooth = true;
+    int theme = 0; // System, Pearl, Midnight, Graphite, Ocean, Forest, Sunset.
+    int adjustmentStep = 5;
+    int openingShortcut = 0; // Alt+S, Ctrl+Alt+S, Ctrl+Shift+S.
+    bool resumeOnLaunch = false;
+    std::wstring selectedDisplay;
     std::map<std::wstring, int> monitors;
     int forMonitor(const std::wstring& device) const {
         const auto it = monitors.find(device);

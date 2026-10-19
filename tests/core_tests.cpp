@@ -63,6 +63,8 @@ int main() {
     check(fade.value == 120 && fade.velocity == 0, "Emergency / reduced-motion changes must snap immediately");
     Settings settings;
     check(settings.paused, "First run must be transparent");
+    check(!settings.resumeOnLaunch && settings.theme == 0 && settings.adjustmentStep == 5 && settings.openingShortcut == 0,
+          "New preferences must preserve safe startup and familiar defaults");
     settings.monitors[L"DISPLAY-A"] = 30;
     check(settings.forMonitor(L"DISPLAY-A") == 30 && settings.forMonitor(L"DISPLAY-B") == 70,
           "Overrides must isolate monitors");

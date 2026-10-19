@@ -2,7 +2,7 @@
 
 ## Normal setup
 
-Download the `Screen-preview-x64` CI artifact for Intel/AMD Windows, or `Screen-preview-arm64` for Windows on Arm. Extract it and open `Screen-Setup-0.3.0-x64.exe` or its ARM64 equivalent.
+Download the `Screen-preview-x64` CI artifact for Intel/AMD Windows, or `Screen-preview-arm64` for Windows on Arm. Extract it and open `Screen-Setup-0.4.0-x64.exe` or its ARM64 equivalent.
 
 Setup installs under `%LOCALAPPDATA%\Programs\Shardapps\Screen`, creates **Shardapps → Screen by Shardapps** in the Start menu, and registers a per-user uninstall entry. A desktop shortcut is optional. It needs no administrator rights and does not add certificates or change trust settings. Close Screen using its tray menu before reinstalling, upgrading, or uninstalling it.
 
@@ -12,7 +12,7 @@ This remains an unsigned developer preview. Windows may show SmartScreen or unkn
 
 Extract `Screen-portable-x64.zip` or the ARM64 ZIP completely into a folder, then run `Screen.exe`. A portable ZIP is not an installer and creates no Start menu or uninstall entry.
 
-Both forms start paused. Move the slider to apply dimming. **Alt+S** opens/hides the compact panel above the bottom-right taskbar; **Ctrl+Alt+S** is the fallback when Alt+S is reserved. Click outside or press Escape to dismiss it. Right-click the tray icon or panel for display/tint settings, pause, restore and **Quit**. Emergency restore is **Ctrl + Alt + Shift + F12**.
+Both forms start paused by default; Preferences can explicitly enable resuming saved dimming. Move the slider to apply dimming. **Alt+S** opens/hides the compact panel above the bottom-right taskbar; **Ctrl+Alt+S** is the fallback when Alt+S is reserved. Click outside or press Escape to dismiss it. Right-click the tray icon or panel for display/tint settings, pause, restore and **Quit**. Emergency restore is **Ctrl + Alt + Shift + F12**.
 
 ## Why the MSIX fails to install
 
@@ -25,3 +25,7 @@ Normal MSIX installation needs a valid package signature trusted by Windows. Mic
 For a setup installation, quit Screen, then use **Windows Settings → Apps → Installed apps → Screen by Shardapps → Uninstall**. Portable users can quit and delete their extracted folder.
 
 Both preserve preferences at `%LOCALAPPDATA%\Shardapps\Screen\settings.ini`. Delete that file with Screen closed if you also want to remove preferences. Setup does not enable automatic startup or change hardware brightness.
+
+## Personalize and start at sign-in
+
+Open the settings icon in the flyout or choose Settings from the tray menu. Displays offers screen selection, presets, identify screens and a 15-minute pause. Appearance offers Pearl, Midnight, Graphite, Ocean, Forest, Sunset and System. Preferences offers opt-in Windows startup, separate saved-dimming resume, warm tint, smooth transitions, adjustment steps and the opening shortcut. Windows startup settings can disable startup independently. Portable users should keep the executable at the registered path, or turn startup off before moving it. Setup uninstall removes a matching startup entry.

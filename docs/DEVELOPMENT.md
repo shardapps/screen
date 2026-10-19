@@ -53,7 +53,7 @@ Run `python scripts/generate_assets.py` after changing the deterministic icon ge
 
 ```powershell
 ./scripts/installer.ps1 -Architecture x64 -Executable build/x64/Release/Screen.exe
-./scripts/test-installer.ps1 -Installer dist/Screen-Setup-0.3.0-x64.exe
+./scripts/test-installer.ps1 -Installer dist/Screen-Setup-0.4.0-x64.exe
 ```
 
 The installer helper discovers ISCC.exe in standard locations or accepts `-InnoCompiler`. It checks the executable's architecture and refuses to overwrite an existing setup output. The test uses a unique folder under `build/`, installs for the current user, verifies the Start menu and uninstall entry, runs the real app smoke test, reinstalls, and uninstalls. It refuses to run if Screen is already installed or running, and preserves preferences through the app smoke test. Use a clean test profile on Windows on Arm to test the ARM64 installer.
@@ -74,3 +74,9 @@ The installer helper discovers ISCC.exe in standard locations or accepts `-InnoC
 | `build/`, `dist/` | Ignored local outputs |
 
 All development occurs on branches and is submitted through focused PRs. No Store credentials or signing keys belong in this repository.
+
+## Settings regression checks
+
+Run `./scripts/settings-test.ps1 -Executable build/x64/Release/Screen.exe`. It preserves the exact INI and Run value, tests all themes, screen selection, presets, timed pause, shortcut/step/resume persistence, startup enable/disable and matching-path uninstall cleanup, quiet startup helper, small-window scrolling, and repeated open/close GDI lifetime. Optional `-CaptureDirectory build/settings-captures` saves actual settings screenshots. The installed-app CI test also exercises these controls. Packaged StartupTask consent/policy and sign-in activation remain manual Store validation checks.
+
+Settings code lives in `src/preferences.*`; shared palettes/slider drawing in `src/ui.*`; startup registration in `src/startup.*`; the MSIX-only quiet launcher in `src/startup_entry.cpp`. Build the complete CMake project before packaging so the launcher is present.

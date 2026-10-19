@@ -21,7 +21,7 @@ public:
     ~OverlayEngine();
     OverlayEngine(const OverlayEngine&) = delete;
     OverlayEngine& operator=(const OverlayEngine&) = delete;
-    void submit(const Settings& settings, bool persist = false, bool rebuild = false);
+    void submit(const Settings& settings, bool persist = false, bool rebuild = false, bool immediate = false);
     bool healthy() const noexcept { return control_ != nullptr; }
 private:
     struct Surface {
@@ -35,7 +35,7 @@ private:
     std::mutex mutex_;
     std::atomic<bool> pending_{false};
     Settings desired_, active_;
-    bool persist_ = false, rebuild_ = false;
+    bool persist_ = false, rebuild_ = false, immediate_ = false;
     bool sessionLocked_ = false, motionAllowed_ = true;
     bool fading_ = false, coveragePending_ = false, auditing_ = false;
     bool overlayOnly_ = false, desktopMode_ = false, desktopBlocked_ = false;

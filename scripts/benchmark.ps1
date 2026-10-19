@@ -5,7 +5,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $binary = (Resolve-Path -LiteralPath $Executable).Path
-$process = Start-Process -FilePath $binary -ArgumentList '--background' -WindowStyle Hidden -PassThru
+$process = Start-Process -FilePath $binary -ArgumentList '--background','--paused' -WindowStyle Hidden -PassThru
 try {
     Start-Sleep -Seconds 2
     if ($process.HasExited) { throw 'Screen exited; close any existing instance before benchmarking.' }

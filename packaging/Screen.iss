@@ -3,7 +3,7 @@
   #error AppBinary must point to a built Screen.exe
 #endif
 #ifndef AppVersion
-  #define AppVersion "0.3.0"
+  #define AppVersion "0.4.0"
 #endif
 #ifndef TargetArchitecture
   #error TargetArchitecture must be x64 or arm64
@@ -61,3 +61,6 @@ Name: "{autodesktop}\Screen by Shardapps"; Filename: "{app}\Screen.exe"; Working
 
 [Run]
 Filename: "{app}\Screen.exe"; Description: "Open Screen"; Flags: nowait postinstall skipifsilent
+
+[UninstallRun]
+Filename: "{app}\Screen.exe"; Parameters: "--remove-startup"; Flags: runhidden; RunOnceId: "RemoveScreenStartup"

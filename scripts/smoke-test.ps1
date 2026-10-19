@@ -62,6 +62,13 @@ function Set-Level([int]$level, [bool]$tracking = $false) {
     [void][ScreenSmoke]::SendMessage($slider, 0x0405, [IntPtr]1, [IntPtr]$level)
     [void][ScreenSmoke]::SendMessage($window, 0x0114, [IntPtr]$(if ($tracking) {5} else {8}), $slider)
 }
+function Wait-Alpha([int]$expected) {
+    $deadline=[Diagnostics.Stopwatch]::StartNew()
+    do {
+        try { Assert-Alpha $expected; return } catch { if($deadline.ElapsedMilliseconds -ge 2000){throw} }
+        Start-Sleep -Milliseconds 25
+    } while($true)
+}
 function Move-Offscreen {
     foreach ($surface in $script:surfaces) {
         if (-not [ScreenSmoke]::SetWindowPos($surface, [IntPtr](-1), -32000, -32000, 16, 16, 0x0010)) { throw 'Cannot isolate test surface.' }
@@ -76,7 +83,9 @@ function Assert-Above([IntPtr]$surface, [IntPtr]$other) {
 }
 try {
     [void][ScreenSmoke]::SetThreadDpiAwarenessContext([IntPtr](-4))
-    $process = Start-Process -FilePath $binary -ArgumentList '--background','--overlay' -WindowStyle Hidden -PassThru
+    [void][IO.Directory]::CreateDirectory((Split-Path -Parent $settingsFile))
+    [IO.File]::WriteAllText($settingsFile,"brightness=70`nsmooth=1`nwarm=0`nresume=0`n")
+    $process = Start-Process -FilePath $binary -ArgumentList '--background','--overlay','--paused' -WindowStyle Hidden -PassThru
     $window = [IntPtr]::Zero
     for ($i = 0; $i -lt 100 -and $window -eq [IntPtr]::Zero; $i++) {
         Start-Sleep -Milliseconds 100
@@ -106,7 +115,7 @@ try {
     [void][ScreenSmoke]::SendMessage($script:surfaces[0], 0x0010, [IntPtr]0, [IntPtr]0)
     Set-Level 100; Start-Sleep -Milliseconds 100; Get-Surfaces; Assert-Alpha 0
     Move-Offscreen
-    Set-Level 8; Start-Sleep -Milliseconds 400; Assert-Alpha 235
+    Set-Level 8; Wait-Alpha 235
     # A different process creates/promotes an intersecting topmost window.
     $foreign = [ScreenSmoke]::CreateWindowEx(0x08000088, 'STATIC', 'Screen coverage test', 2147483648,
         -32000, -32000, 16, 16, [IntPtr]::Zero, [IntPtr]::Zero, [IntPtr]::Zero, [IntPtr]::Zero)
@@ -131,7 +140,7 @@ try {
         Set-Level (40 + $inputStep % 35) $true
         Start-Sleep -Milliseconds 2
     }
-    Set-Level 60; Start-Sleep -Milliseconds 400; Assert-Alpha 102
+    Set-Level 60; Wait-Alpha 102
     # Open the new mini panel, verify bounded dimensions and work-area anchoring.
     [void][ScreenSmoke]::SendMessage($window, 0x0312, [IntPtr]5, [IntPtr]0)
     Start-Sleep -Milliseconds 250

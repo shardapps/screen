@@ -51,13 +51,21 @@ At zero opacity the compatibility surface is hidden and the desktop color runtim
 
 ## Compact controls
 
-The UI is a 330 × 136 DPI-scaled tool window, anchored inside the work area of the tray icon's monitor (cursor monitor fallback). It stays above the bottom-right taskbar, without an Alt+Tab/taskbar entry. Alt+S opens/hides it; Ctrl+Alt+S is the fallback when reserved. Native slider keyboard/MSAA/UIA behavior is preserved while custom drawing supplies a quiet rounded track. Display selection, tint, pause, restore and quit live in the context/tray menu.
+The UI is a 330 × 136 DPI-scaled tool window, anchored inside the work area of the tray icon's monitor (cursor monitor fallback). It stays above the bottom-right taskbar, without an Alt+Tab/taskbar entry. Alt+S opens/hides it; Ctrl+Alt+S is the fallback when reserved. Native slider keyboard/MSAA/UIA behavior is preserved while custom drawing supplies a quiet rounded track. The footer opens display selection and the settings icon opens an on-demand native settings window. Context/tray controls remain available.
 
-The panel uses system-aware light/dark/high-contrast colors. Opening takes about 160 ms with a small fade/slide; dismissal takes about 90 ms. These timers run only during the transition. Escape or losing focus dismisses the panel, while dimming and tray access remain active.
+The panel and settings share six named palettes plus System, with high-contrast priority. Opening takes about 160 ms with a small fade/slide; dismissal takes about 90 ms. These timers run only during the transition. Escape or losing focus dismisses the panel, while dimming and tray access remain active.
+
+## Settings and startup
+
+The settings window uses native controls and GDI drawing. Its fonts, brushes and child windows are created on demand and released on close. Short windows scroll; DPI changes rebuild the scaled layout. There is no retained web view, image cache, or idle animation loop. Page highlight transitions run for about 120 ms and respect Windows' animation preference. Both sliders share one buffered renderer and retain native input/accessibility behavior.
+
+Settings snapshots are coalesced on the rendering worker; disk I/O stays off the UI thread. Atomic replacement retries only transient sharing/access failures for up to 155 ms. The selected Windows display name is persisted alongside brightness overrides; reconnecting hardware may require reselecting a display. The 15-minute pause uses a single deadline timer and is cancelled by manual brightness/pause/restore actions.
+
+Startup is opt-in. Unpackaged builds register the exact quoted executable in HKCU Run with --background --startup. Uninstall removes it only when it matches this executable. MSIX builds declare a disabled StartupTask and query/change it through C++/WinRT on a short-lived background worker, with bounded asynchronous waits. A small packaged ScreenStartup.exe forwards the quiet arguments to Screen.exe and exits. Windows user/policy decisions take priority. Resume dimming is a separate preference, so quiet startup remains paused by default.
 
 ## Recovery
 
-- A fresh process always starts paused, retaining brightness preferences without automatically applying them.
+- A fresh process starts paused by default. Resuming saved dimming is an explicit preference; --paused always overrides it.
 - Dimming is capped at approximately 92% opacity; corrupt settings cannot create a fully opaque black screen.
 - Emergency restore pauses and resets all brightness overrides to 100%, bypassing animation.
 - Rendering/window-creation failure destroys every current surface and notifies the UI.

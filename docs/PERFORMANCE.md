@@ -1,5 +1,17 @@
 # Performance measurements
 
+## v0.4.0 native settings sample
+
+Measured October 19, 2026 with the same Release x64 compiler/OS/display setup as below. Each row starts a separate process, settles for two seconds after the requested state, and measures process CPU over ten seconds. Settings and startup registrations were restored after tests.
+
+| Metric | Paused tray | Desktop at 99% | Settings open | Settings opened, then closed |
+| --- | ---: | ---: | ---: | ---: |
+| Working set | 13.66 MiB | 13.89 MiB | 19.44 MiB | 19.48 MiB |
+| Private committed memory | 2.25 MiB | 2.25 MiB | 2.91 MiB | 2.89 MiB |
+| Process CPU time over 10 seconds | 0 ms measured | 0 ms measured | 0 ms measured | 0 ms measured |
+
+The executable was 482,304 bytes (471 KiB). Settings are created on demand; fonts, brushes and controls are released on close. Windows may keep loaded shared UI pages resident afterward, as the final column shows. Eight repeated opens/closes measured 36 → 37 GDI objects, with no per-open growth. These single local samples do not establish a universal memory budget or literal zero CPU, and exclude compositor/GPU costs. CI repeats behavioral and resource-lifetime checks rather than asserting machine-specific memory values.
+
 ## v0.3.0 desktop backend sample
 
 Measured October 19, 2026: Release x64, MSVC 19.51, Windows 11 build 26200, one display. Two separate processes started paused; the active process then received an All displays slider change to 99%. After a two-second settling interval, process CPU deltas were sampled over ten seconds. Preferences were restored after the measurement.

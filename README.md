@@ -20,7 +20,7 @@ Software brightness control across your desktop, with smooth fades, per-monitor 
 
 Screen by **Shardapps** dims Windows desktop output using a full-desktop color transform, with click-through overlays for separate per-display levels and compatibility. Lower the slider to reduce perceived brightness across apps, including ordinary full-screen video app layers. It works independently of a monitor's brightness API and does not change hardware backlight settings.
 
-**Status: developer preview, v0.3.0.** CI produces per-user setup EXEs and portable ZIPs. Unsigned MSIX files are separate packaging-validation artifacts, not normal installers. Microsoft Store publication and certification are pending; there is no Store listing yet.
+**Status: developer preview, v0.4.0.** CI produces per-user setup EXEs and portable ZIPs. Unsigned MSIX files are separate packaging-validation artifacts, not normal installers. Microsoft Store publication and certification are pending; there is no Store listing yet.
 
 ## Built to stay out of your way
 
@@ -30,19 +30,27 @@ Screen by **Shardapps** dims Windows desktop output using a full-desktop color t
 | Multi-monitor dimming | Adjust all displays together or select one display. Monitor geometry refreshes when Windows reports a display change. |
 | Compact flyout | A 330 × 136 panel above the bottom-right taskbar. Open with Alt+S, adjust the slider, then click outside or press Escape. |
 | Smooth transitions | Velocity-preserving fades keep moving through rapid slider updates. Short panel transitions respect Windows' animation preference. |
+| Six palettes + System | Pearl, Midnight, Graphite, Ocean, Forest and Sunset, shared by the flyout and settings. Windows high contrast takes priority. |
+| Proper settings | A screen picker, identify screens, brightness presets, a 15-minute pause, and configurable shortcut/adjustment step. |
+| Start with Windows | Opt in to quiet tray startup; separately choose whether to resume saved dimming. |
 | Optional warm tint | Add a subtle warm color while dimming. This changes displayed colors. |
 | Background controls | Close to the system tray; reopen, pause, restore, or quit from its menu. |
 | Keyboard access | Alt+S opens/hides the panel. Native arrow/page keys adjust its slider; global brightness, pause, and emergency restore shortcuts remain available. |
-| Recovery by design | Transparent startup, an 8% brightness floor, immediate emergency restore, and automatic overlay cleanup on exit. |
+| Recovery by design | Paused startup by default, an 8% brightness floor, immediate emergency restore, and automatic overlay cleanup on exit. |
 | Full-screen app coverage | Desktop color processing avoids the overlay's window-order limit; a compatibility renderer remains available. |
 | Local and private | No account, telemetry, advertising, network client, or administrator prompt. |
 
 <details>
 <summary>See the actual Windows app</summary>
 
-<img src="docs/assets/screenshot.png" alt="Actual Screen v0.3.0 compact Windows 11 flyout with a brightness slider, percentage and Alt+S shortcut" width="380" />
+<img src="docs/assets/screenshot.png" alt="Actual Screen v0.4.0 compact Windows 11 flyout with a brightness slider, percentage and Alt+S shortcut" width="380" />
 
-Paused startup at 150% display scaling. The hero above is an interface illustration.
+The compact flyout at 150% display scaling. The hero above is an interface illustration.
+
+<img src="docs/assets/settings-themes.png" alt="Screen settings with six Windows brightness app themes and a System palette" width="500" />
+
+<img src="docs/assets/settings-displays.png" alt="Screen selection, brightness presets, timed pause and identify screens" width="420" />
+<img src="docs/assets/settings-preferences.png" alt="Screen startup, saved dimming, smooth transitions and keyboard preferences" width="420" />
 
 </details>
 
@@ -50,10 +58,10 @@ Paused startup at 150% display scaling. The hero above is an interface illustrat
 
 1. Open a successful [Windows CI run](https://github.com/shardapps/screen/actions/workflows/ci.yml). GitHub requires sign-in to download workflow artifacts.
 2. Download `Screen-preview-x64` for an Intel/AMD PC, or `Screen-preview-arm64` for Windows on Arm, and extract the artifact ZIP.
-3. Quit any older Screen copy from its tray menu, then run **`Screen-Setup-0.3.0-x64.exe`** (or ARM64 setup). It updates the existing per-user installation, adds a Start menu shortcut, and supports uninstall through **Settings → Apps**. Alternatively, extract the portable ZIP completely and run `Screen.exe`. These previews are unsigned; Windows may show an unknown publisher/SmartScreen warning, and managed policies may block them. Review the source/build before running them.
-4. Move the slider to enable dimming. Screen always starts paused; your saved brightness and preferences are retained. Right-click the tray icon or panel for display selection, warm tint, smooth transitions, pause, restore and quit.
+3. Quit any older Screen copy from its tray menu, then run **`Screen-Setup-0.4.0-x64.exe`** (or ARM64 setup). It updates the existing per-user installation, adds a Start menu shortcut, and supports uninstall through **Settings → Apps**. Alternatively, extract the portable ZIP completely and run `Screen.exe`. These previews are unsigned; Windows may show an unknown publisher/SmartScreen warning, and managed policies may block them. Review the source/build before running them.
+4. Move the slider to enable dimming. Screen starts paused by default. Click the settings icon for **Displays**, **Appearance**, and **Preferences**. Choose a screen directly from the flyout footer or in settings. Your selection and preferences are retained.
 
-Alt+S toggles the flyout. Click outside it or press Escape to dismiss it while dimming continues. Choose **Quit** in the tray menu to stop Screen and restore the desktop. `Screen.exe --background` starts in the tray, paused. Automatic startup is not enabled by this preview.
+Alt+S toggles the flyout. Click outside it or press Escape to dismiss it while dimming continues. Choose **Quit** in the tray menu to stop Screen and restore the desktop. `Screen.exe --background` starts quietly in the tray. Enable **Start with Windows** in Preferences to launch at sign-in. **Resume saved dimming when Screen opens** is a separate opt-in; `Screen.exe --paused` overrides it for recovery. Choose Alt+S, Ctrl+Alt+S or Ctrl+Shift+S as the opening shortcut.
 
 **MSIX install error?** `Screen-msix-validation-*` artifacts contain unsigned packages for packaging development. Windows App Installer does not accept them as normal trusted installers. Use the setup EXE or portable app above; see [installation help](docs/INSTALLATION.md).
 
@@ -61,8 +69,8 @@ Alt+S toggles the flyout. Click outside it or press Escape to dismiss it while d
 | --- | --- |
 | `Alt + S` | Open / hide the brightness flyout (`Ctrl + Alt + S` fallback if reserved) |
 | `Ctrl + Alt + D` | Pause / enable dimming |
-| `Ctrl + Alt + ↓` | Dim all displays by 5 percentage points |
-| `Ctrl + Alt + ↑` | Brighten all displays by 5 percentage points |
+| `Ctrl + Alt + ↓` | Dim the selected screen(s) by the chosen step (default 5%) |
+| `Ctrl + Alt + ↑` | Brighten the selected screen(s) by the chosen step (default 5%) |
 | `Ctrl + Alt + Shift + F12` | Immediately restore all displays to 100% and pause |
 
 Other software can reserve a shortcut. The flyout shows the opening shortcut that registered successfully; the tray icon always remains an access path. Selecting **Display → All displays** in the menu and moving the slider replaces per-display overrides.
@@ -87,15 +95,15 @@ Different per-display levels, a busy/unavailable color API, or `Screen.exe --ove
 
 ### A measured starting point
 
-Local v0.3.0 x64 samples on Windows 11 build 26200, with one connected display:
+Local v0.4.0 x64 samples on Windows 11 build 26200, with one connected display:
 
 | Measurement | Paused | Active desktop dimming at 99% |
 | --- | ---: | ---: |
-| Process working set | 13.54 MiB | 13.79 MiB |
-| Private committed memory | 2.21 MiB | 2.24 MiB |
-| Process CPU time over 10 seconds | 0 ms measured | 15.625 ms measured |
+| Process working set | 13.66 MiB | 13.89 MiB |
+| Private committed memory | 2.25 MiB | 2.25 MiB |
+| Process CPU time over 10 seconds | 0 ms measured | 0 ms measured |
 
-The development executable is about **412 KiB**. These are individual measurements, **not memory or CPU guarantees**, and exclude compositor/GPU memory. Resolution, display count, drivers, Windows version, and other activity affect results. [Measurement details](docs/PERFORMANCE.md).
+The development executable is about **471 KiB**. Opening native settings measured 19.44 MiB working set and 2.91 MiB private commit. These are individual measurements, **not memory or CPU guarantees**, and exclude compositor/GPU memory. Resolution, display count, drivers, Windows version, and other activity affect results. [Measurement details](docs/PERFORMANCE.md).
 
 ## Compatibility and honest limits
 

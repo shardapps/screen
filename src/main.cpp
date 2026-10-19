@@ -1,5 +1,7 @@
 #include "overlay.hpp"
 #include "settings.hpp"
+#include "preferences.hpp"
+#include <string_view>
 #include <windowsx.h>
 #include <commctrl.h>
 #include <dwmapi.h>
@@ -10,53 +12,45 @@ namespace {
 constexpr wchar_t windowClass[] = L"Shardapps.Screen.Control";
 constexpr UINT trayMessage = WM_APP + 2, showMessage = WM_APP + 3;
 constexpr int sliderId = 101, pauseId = 103, warmId = 104, smoothId = 105,
-              exitId = 107, restoreId = 108, openId = 109, displayBase = 200;
+              exitId = 107, restoreId = 108, openId = 109, displayPickerId = 110, preferencesId = 111, displayBase = 200;
 constexpr int panelWidth = 330, panelHeight = 136;
-LRESULT CALLBACK sliderProcedure(HWND, UINT, WPARAM, LPARAM, UINT_PTR, DWORD_PTR);
+
 
 struct App {
-    HWND window{}, slider{}, label{}, value{}, footer{}, shortcut{};
+    HWND window{}, slider{}, label{}, value{}, footer{}, shortcut{}, preferencesButton{};
     HFONT regular{}, number{}, footerFont{};
     HBRUSH background{};
     HICON icon{};
     UINT dpi = 96, taskbarCreated = 0;
     bool trayPresent = false, menuActive = false, animating = false, opening = false, placing = false;
     bool overlayOnly = false, desktopCoverage = true;
+    bool timedPause = false;
+    int registeredShortcut = -1;
     double panelAlpha = 255, fromAlpha = 255, toAlpha = 255;
     RECT destination{};
     std::chrono::steady_clock::time_point animationStart;
     COLORREF bg{}, fg{}, muted{}, accent{}, track{}, border{};
+    screen::ui::Palette colors{};
     std::wstring statusText, selected, shortcutText = L"Alt + S";
     screen::Settings settings = screen::loadSettings();
     std::vector<screen::Monitor> displays;
     std::unique_ptr<screen::OverlayEngine> engine;
+    std::unique_ptr<screen::PreferencesWindow> preferences;
+    screen::StartupController startup;
+    screen::StartupState startupState = screen::StartupState::unknown;
     ~App() {
+        if (preferences) preferences->close();
         for (auto font : {regular, number, footerFont}) if (font) DeleteObject(font);
         if (background) DeleteObject(background);
     }
     int px(int valuePx) const { return MulDiv(valuePx, static_cast<int>(dpi), 96); }
     int brightness() const { return selected.empty() ? settings.brightness : settings.forMonitor(selected); }
     void theme() {
-        HIGHCONTRASTW contrast{sizeof(contrast)};
-        SystemParametersInfoW(SPI_GETHIGHCONTRAST, sizeof(contrast), &contrast, 0);
-        DWORD light = 1, size = sizeof(light);
-        RegGetValueW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
-            L"AppsUseLightTheme", RRF_RT_REG_DWORD, nullptr, &light, &size);
-        if (contrast.dwFlags & HCF_HIGHCONTRASTON) {
-            bg = GetSysColor(COLOR_WINDOW); fg = muted = GetSysColor(COLOR_WINDOWTEXT);
-            accent = GetSysColor(COLOR_HIGHLIGHT); track = GetSysColor(COLOR_GRAYTEXT); border = fg;
-        } else if (light) {
-            bg = RGB(249, 249, 252); fg = RGB(34, 35, 45); muted = RGB(108, 108, 125);
-            accent = RGB(112, 87, 210); track = RGB(222, 221, 231); border = RGB(220, 219, 231);
-        } else {
-            bg = RGB(35, 35, 40); fg = RGB(244, 242, 250); muted = RGB(173, 169, 187);
-            accent = RGB(183, 164, 255); track = RGB(75, 71, 86); border = RGB(65, 61, 75);
-        }
+        colors = screen::ui::palette(settings.theme);
+        bg=colors.bg; fg=colors.fg; muted=colors.muted; accent=colors.accent; track=colors.track; border=colors.border;
         if (background) DeleteObject(background);
         background = CreateSolidBrush(bg);
-        const BOOL dark = light == 0;
-        DwmSetWindowAttribute(window, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark, sizeof(dark));
-        DwmSetWindowAttribute(window, DWMWA_BORDER_COLOR, &border, sizeof(border));
+        screen::ui::windowTheme(window,colors);
         InvalidateRect(window, nullptr, TRUE);
         if (slider) InvalidateRect(slider, nullptr, TRUE);
     }
@@ -82,7 +76,8 @@ struct App {
         };
         move(label, 49, 22, 180, 23); move(value, 238, 15, 68, 33);
         move(slider, 18, 57, 294, 34);
-        move(footer, 24, 105, 207, 18); move(shortcut, 235, 105, 71, 18);
+        move(footer, 20, 101, 187, 26); move(shortcut, 211, 105, 67, 18);
+        move(preferencesButton, 287, 101, 26, 26);
         RECT client{}; GetClientRect(window, &client);
         SetWindowRgn(window, CreateRoundRectRgn(0, 0, client.right, client.bottom, px(22), px(22)), TRUE);
     }
@@ -91,9 +86,10 @@ struct App {
         label = control(L"STATIC", L"Brightness", SS_NOPREFIX, 0);
         slider = control(TRACKBAR_CLASSW, L"Brightness", TBS_HORZ | TBS_NOTICKS | WS_TABSTOP, sliderId);
         value = control(L"STATIC", L"70%", SS_RIGHT | SS_NOPREFIX, 0);
-        footer = control(L"STATIC", L"Paused · All displays", SS_NOPREFIX, 0);
+        footer = control(L"BUTTON", L"Paused · All displays", BS_OWNERDRAW | WS_TABSTOP, displayPickerId);
         shortcut = control(L"STATIC", shortcutText.c_str(), SS_RIGHT | SS_NOPREFIX, 0);
-        SetWindowSubclass(slider, sliderProcedure, 1, reinterpret_cast<DWORD_PTR>(this));
+        preferencesButton = control(L"BUTTON", L"Settings", BS_OWNERDRAW | WS_TABSTOP, preferencesId);
+        SetWindowSubclass(slider, screen::ui::sliderProcedure, 1, 0);
         SendMessageW(slider, TBM_SETRANGE, TRUE, MAKELPARAM(screen::minBrightness, screen::maxBrightness));
         SendMessageW(slider, TBM_SETPAGESIZE, 0, 5);
         fonts(); layout(); sync();
@@ -110,6 +106,7 @@ struct App {
             (settings.paused ? L"" : desktopCoverage ? L" · Desktop" : L" · Overlay") : statusText;
         SetWindowTextW(footer, summary.c_str());
         SetWindowTextW(shortcut, shortcutText.c_str());
+        if (preferences) preferences->refresh();
         if (trayPresent && !tracking) {
             NOTIFYICONDATAW data{sizeof(data)}; data.hWnd = window; data.uID = 1; data.uFlags = NIF_TIP;
             const auto tip = settings.paused ? std::wstring(L"Screen by Shardapps · Paused") : settings.monitors.empty() ?
@@ -119,12 +116,11 @@ struct App {
         }
     }
     void apply(bool persist = true, bool immediate = false, bool tracking = false) {
-        auto update = settings;
-        if (immediate) update.smooth = false;
-        engine->submit(update, persist);
+        engine->submit(settings, persist, false, immediate);
         sync(tracking);
     }
     void setBrightness(int level) {
+        cancelTimedPause();
         if (selected.empty()) settings.setAll(level);
         else settings.monitors[selected] = screen::clampBrightness(level);
         settings.paused = false; statusText.clear();
@@ -195,18 +191,92 @@ struct App {
         else { statusText = L"Tray unavailable"; sync(); }
     }
     void restore() {
+        cancelTimedPause();
         settings.paused = true; settings.setAll(100); statusText.clear(); apply(true, true);
     }
     void refreshDisplays() {
         displays = screen::enumerateMonitors();
         if (!selected.empty() && std::none_of(displays.begin(), displays.end(),
-            [&](const auto& display) { return display.device == selected; })) selected.clear();
+            [&](const auto& display) { return display.device == selected; })) { selected.clear(); settings.selectedDisplay.clear(); }
+        if (preferences) preferences->refresh(true);
+    }
+    void cancelTimedPause() { KillTimer(window, 20); timedPause = false; }
+    void pauseFor15Minutes() {
+        settings.paused = true; statusText = L"Paused for 15 minutes";
+        timedPause = SetTimer(window, 20, 15 * 60 * 1000, nullptr) != 0;
+        if (!timedPause) statusText = L"Paused · timer unavailable";
+        apply(false);
+    }
+    bool bindShortcut(int index) {
+        constexpr UINT modifiers[] = {MOD_ALT, MOD_CONTROL | MOD_ALT, MOD_CONTROL | MOD_SHIFT};
+        constexpr const wchar_t* names[] = {L"Alt + S", L"Ctrl + Alt + S", L"Ctrl + Shift + S"};
+        UnregisterHotKey(window, 5); registeredShortcut = -1;
+        if (!RegisterHotKey(window, 5, modifiers[index] | MOD_NOREPEAT, 'S')) return false;
+        registeredShortcut = index; shortcutText = names[index]; return true;
+    }
+    void openPreferences() {
+        refreshDisplays();
+        if (!preferences) preferences = std::make_unique<screen::PreferencesWindow>(settings, displays, selected,
+            [this](screen::PreferenceAction action, int amount) { preference(action, amount); });
+        hide(); preferences->show(window);
+        preferences->startupState(startupState, true);
+        startup.request(window);
+    }
+    void preference(screen::PreferenceAction action, int amount) {
+        using enum screen::PreferenceAction;
+        switch (action) {
+        case display:
+            if (amount >= 0 && static_cast<size_t>(amount) <= displays.size()) selected = amount ? displays[static_cast<size_t>(amount)-1].device : L"";
+            settings.selectedDisplay = selected; statusText.clear(); apply(); return;
+        case brightness: {
+            const bool tracking = (amount & 0x10000) != 0;
+            setBrightness(amount & 0xFFFF); apply(!tracking, false, tracking); return;
+        }
+        case theme: settings.theme = std::clamp(amount, 0, 6); this->theme(); break;
+        case warm: settings.warm = amount != 0; break;
+        case smooth: settings.smooth = amount != 0; break;
+        case resume: settings.resumeOnLaunch = amount != 0; break;
+        case step: settings.adjustmentStep = std::clamp(amount, 1, 10); break;
+        case shortcut: {
+            const auto previous = registeredShortcut;
+            if (amount < 0 || amount > 2) return;
+            if (bindShortcut(amount)) settings.openingShortcut = amount;
+            else {
+                if (previous >= 0) bindShortcut(previous);
+                else shortcutText = L"Tray icon";
+                statusText = L"Shortcut in use · choose another";
+            }
+            break;
+        }
+        case startup:
+            if (this->startup.request(window, amount != 0)) preferences->startupState(startupState, true);
+            return;
+        case pause: cancelTimedPause(); settings.paused = !settings.paused; statusText.clear(); break;
+        case timedPause: pauseFor15Minutes(); return;
+        case restore: this->restore(); return;
+        }
+        apply();
+    }
+    void displayMenu() {
+        menuActive = true; refreshDisplays();
+        const auto popup = CreatePopupMenu();
+        AppendMenuW(popup, MF_STRING | (selected.empty() ? MF_CHECKED : 0), displayBase, L"All displays");
+        for (size_t i=0; i<displays.size(); ++i) {
+            const auto text = L"Display " + std::to_wstring(i+1) + (displays[i].primary ? L" · Primary" : L"");
+            AppendMenuW(popup, MF_STRING | (selected == displays[i].device ? MF_CHECKED : 0), displayBase+i+1, text.c_str());
+        }
+        RECT bounds{}; GetWindowRect(footer, &bounds); SetForegroundWindow(window);
+        const auto command = TrackPopupMenu(popup, TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_BOTTOMALIGN,
+            bounds.left, bounds.top, 0, window, nullptr);
+        DestroyMenu(popup); menuActive = false;
+        if (command) SendMessageW(window, WM_COMMAND, command, 0);
     }
     void menu() {
         menuActive = true; refreshDisplays();
         const auto popup = CreatePopupMenu(), monitors = CreatePopupMenu();
         const auto openText = L"Brightness\t" + shortcutText;
         AppendMenuW(popup, MF_STRING, openId, openText.c_str());
+        AppendMenuW(popup, MF_STRING, preferencesId, L"Settings…");
         AppendMenuW(popup, MF_STRING, pauseId, settings.paused ? L"Enable dimming\tCtrl+Alt+D" : L"Pause dimming\tCtrl+Alt+D");
         AppendMenuW(popup, MF_STRING, restoreId, L"Restore all displays");
         AppendMenuW(popup, MF_SEPARATOR, 0, nullptr);
@@ -243,78 +313,34 @@ struct App {
         SelectObject(dc, previousPen); SelectObject(dc, previousBrush); DeleteObject(pen);
         EndPaint(window, &ps);
     }
-    void paintSlider(HDC dc) {
-        RECT client{}, channel{}, thumb{}; GetClientRect(slider, &client);
-        SendMessageW(slider, TBM_GETCHANNELRECT, 0, reinterpret_cast<LPARAM>(&channel));
-        SendMessageW(slider, TBM_GETTHUMBRECT, 0, reinterpret_cast<LPARAM>(&thumb));
-        FillRect(dc, &client, background);
-        const auto center = (thumb.left + thumb.right) / 2, y = (client.bottom + client.top) / 2;
-        const auto paintRound = [&](RECT rect, int radius, COLORREF color) {
-            const auto brush = CreateSolidBrush(color);
-            const auto oldBrush = SelectObject(dc, brush), oldPen = SelectObject(dc, GetStockObject(NULL_PEN));
-            RoundRect(dc, rect.left, rect.top, rect.right, rect.bottom, radius, radius);
-            SelectObject(dc, oldPen); SelectObject(dc, oldBrush); DeleteObject(brush);
-        };
-        paintRound({channel.left, y - px(2), channel.right, y + px(3)}, px(5), track);
-        if (center > channel.left) paintRound({channel.left, y - px(2), center, y + px(3)}, px(5), accent);
-        const auto radius = px(GetCapture() == slider ? 7 : 8);
-        const auto brush = CreateSolidBrush(accent);
-        const auto oldBrush = SelectObject(dc, brush), oldPen = SelectObject(dc, GetStockObject(NULL_PEN));
-        Ellipse(dc, center - radius, y - radius, center + radius + 1, y + radius + 1);
-        SelectObject(dc, oldPen); SelectObject(dc, oldBrush); DeleteObject(brush);
-        if (GetFocus() == slider && !(SendMessageW(slider, WM_QUERYUISTATE, 0, 0) & UISF_HIDEFOCUS)) {
-            const auto pen = CreatePen(PS_SOLID, 1, muted);
-            const auto focusPen = SelectObject(dc, pen), focusBrush = SelectObject(dc, GetStockObject(NULL_BRUSH));
-            const auto focusRadius = radius + px(3);
-            Ellipse(dc, center - focusRadius, y - focusRadius, center + focusRadius + 1, y + focusRadius + 1);
-            SelectObject(dc, focusBrush); SelectObject(dc, focusPen); DeleteObject(pen);
-        }
-    }
     void renderSlider(HDC target) {
-        RECT client{}; GetClientRect(slider, &client);
-        if (!client.right || !client.bottom) return;
-        // Native trackbar invalidation only covers its own thumb geometry. Paint a
-        // complete buffered frame so our circular thumb never leaves stale pixels.
-        const auto buffer = CreateCompatibleDC(target);
-        const auto bitmap = CreateCompatibleBitmap(target, client.right, client.bottom);
-        if (buffer && bitmap) {
-            const auto previous = SelectObject(buffer, bitmap);
-            paintSlider(buffer);
-            BitBlt(target, 0, 0, client.right, client.bottom, buffer, 0, 0, SRCCOPY);
-            SelectObject(buffer, previous);
-        } else paintSlider(target);
-        if (bitmap) DeleteObject(bitmap);
-        if (buffer) DeleteDC(buffer);
+        screen::ui::drawSlider(slider,target,colors,dpi);
+    }
+    void drawButton(const DRAWITEMSTRUCT& draw) {
+        const auto dc = draw.hDC; auto rect = draw.rcItem; FillRect(dc, &rect, background);
+        const auto previousFont = SelectObject(dc, footerFont);
+        if (draw.CtlID == displayPickerId) {
+            wchar_t text[160]{}; GetWindowTextW(footer, text, 160);
+            rect.left += px(4); rect.right -= px(13);
+            screen::ui::text(dc, rect, text, muted, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+            const auto pen = CreatePen(PS_SOLID, px(1), muted); const auto previous = SelectObject(dc, pen);
+            const auto x = draw.rcItem.right-px(8), y = draw.rcItem.bottom/2;
+            MoveToEx(dc,x-px(3),y-px(1),nullptr); LineTo(dc,x,y+px(2)); LineTo(dc,x+px(3),y-px(1));
+            SelectObject(dc,previous); DeleteObject(pen);
+        } else {
+            const auto pen = CreatePen(PS_SOLID, px(2), (draw.itemState & ODS_SELECTED) ? accent : muted);
+            const auto previous = SelectObject(dc,pen);
+            for (int i=0;i<3;++i) {
+                const auto y=px(7+i*6), x=px(i==1?16:10);
+                MoveToEx(dc,px(5),y,nullptr); LineTo(dc,px(22),y);
+                MoveToEx(dc,x,y-px(2),nullptr); LineTo(dc,x,y+px(3));
+            }
+            SelectObject(dc,previous); DeleteObject(pen);
+        }
+        if ((draw.itemState & ODS_FOCUS) && !(draw.itemState & ODS_NOFOCUSRECT)) DrawFocusRect(dc,&draw.rcItem);
+        SelectObject(dc,previousFont);
     }
 };
-
-LRESULT CALLBACK sliderProcedure(HWND window, UINT message, WPARAM wParam, LPARAM lParam, UINT_PTR, DWORD_PTR data) {
-    auto* app = reinterpret_cast<App*>(data);
-    if (message == WM_ERASEBKGND) return 1;
-    // Let the native paint path initialize its theme/input geometry, but expand
-    // partial invalidations before BeginPaint so the entire custom frame fits.
-    if (message == WM_PAINT) InvalidateRect(window, nullptr, FALSE);
-    if (message == WM_PRINTCLIENT) { app->renderSlider(reinterpret_cast<HDC>(wParam)); return 0; }
-    if (message == WM_KEYDOWN && wParam == VK_ESCAPE) { PostMessageW(GetParent(window), WM_CLOSE, 0, 0); return 0; }
-    if (message == WM_CONTEXTMENU) { SendMessageW(GetParent(window), message, wParam, lParam); return 0; }
-    if (message == WM_LBUTTONDOWN)
-        SendMessageW(window, WM_UPDATEUISTATE, MAKEWPARAM(UIS_SET, UISF_HIDEFOCUS), 0);
-    if (message == WM_KEYDOWN)
-        SendMessageW(window, WM_UPDATEUISTATE, MAKEWPARAM(UIS_CLEAR, UISF_HIDEFOCUS), 0);
-    if (message == WM_NCDESTROY) RemoveWindowSubclass(window, sliderProcedure, 1);
-    const auto result = DefSubclassProc(window, message, wParam, lParam);
-    switch (message) {
-    case TBM_SETPOS: case TBM_SETRANGE: case TBM_SETRANGEMIN: case TBM_SETRANGEMAX:
-    case WM_MOUSEMOVE:
-        if (wParam & MK_LBUTTON) InvalidateRect(window, nullptr, FALSE);
-        break;
-    case WM_LBUTTONDOWN: case WM_LBUTTONUP: case WM_CAPTURECHANGED:
-    case WM_KEYDOWN: case WM_KEYUP: case WM_MOUSEWHEEL:
-    case WM_SETFOCUS: case WM_KILLFOCUS: case WM_UPDATEUISTATE:
-        InvalidateRect(window, nullptr, FALSE); break;
-    }
-    return result;
-}
 LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
     auto* app = reinterpret_cast<App*>(GetWindowLongPtrW(window, GWLP_USERDATA));
     if (message == WM_NCCREATE) {
@@ -338,9 +364,7 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
         RegisterHotKey(window, 1, mods, 'D'); RegisterHotKey(window, 2, mods, VK_DOWN);
         RegisterHotKey(window, 3, mods, VK_UP);
         if (!RegisterHotKey(window, 4, mods | MOD_SHIFT, VK_F12)) app->statusText = L"Restore shortcut in use";
-        if (!RegisterHotKey(window, 5, MOD_ALT | MOD_NOREPEAT, 'S')) {
-            app->shortcutText = RegisterHotKey(window, 5, mods, 'S') ? L"Ctrl + Alt + S" : L"Tray icon";
-        }
+        if (!app->bindShortcut(app->settings.openingShortcut) && !app->bindShortcut(1) && !app->bindShortcut(0)) app->shortcutText = L"Tray icon";
         const DWM_WINDOW_CORNER_PREFERENCE corner = DWMWCP_ROUND;
         DwmSetWindowAttribute(window, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
         SetLayeredWindowAttributes(window, 0, 255, LWA_ALPHA); app->sync(); return 0;
@@ -359,25 +383,30 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
             if (draw->dwDrawStage == CDDS_PREPAINT) { app->renderSlider(draw->hdc); return CDRF_SKIPDEFAULT; }
         }
         break;
+    case screen::ui::printSlider: app->renderSlider(reinterpret_cast<HDC>(wParam)); return 0;
+    case WM_DRAWITEM: app->drawButton(*reinterpret_cast<DRAWITEMSTRUCT*>(lParam)); return TRUE;
     case WM_COMMAND: {
         const auto command = LOWORD(wParam);
         if (command == exitId) DestroyWindow(window);
         else if (command == openId) app->show();
+        else if (command == preferencesId) app->openPreferences();
+        else if (command == displayPickerId) app->displayMenu();
         else if (command == IDCANCEL) app->hide();
-        else if (command == pauseId) { app->settings.paused = !app->settings.paused; app->statusText.clear(); app->apply(); }
+        else if (command == pauseId) { app->cancelTimedPause(); app->settings.paused = !app->settings.paused; app->statusText.clear(); app->apply(); }
         else if (command == restoreId) app->restore();
         else if (command == warmId) { app->settings.warm = !app->settings.warm; app->apply(); }
         else if (command == smoothId) { app->settings.smooth = !app->settings.smooth; app->apply(); }
         else if (command >= displayBase && static_cast<size_t>(command - displayBase) <= app->displays.size()) {
             app->selected = command == displayBase ? L"" : app->displays[command - displayBase - 1].device;
-            app->statusText.clear(); app->sync();
+            app->settings.selectedDisplay = app->selected; app->statusText.clear(); app->apply();
         }
         return 0;
     }
     case WM_HOTKEY:
-        if (wParam == 1) { app->settings.paused = !app->settings.paused; app->statusText.clear(); app->apply(); }
+        if (wParam == 1) { app->cancelTimedPause(); app->settings.paused = !app->settings.paused; app->statusText.clear(); app->apply(); }
         else if (wParam == 2 || wParam == 3) {
-            app->settings.setAll(app->settings.brightness + (wParam == 2 ? -5 : 5));
+            app->cancelTimedPause();
+            app->settings.setAll(app->settings.brightness + (wParam == 2 ? -app->settings.adjustmentStep : app->settings.adjustmentStep));
             app->settings.paused = false; app->statusText.clear(); app->apply();
         } else if (wParam == 4) app->restore();
         else if (wParam == 5) { if (IsWindowVisible(window) && (!app->animating || app->opening)) app->hide(); else app->show(); }
@@ -393,20 +422,27 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
         if (LOWORD(wParam) == WA_INACTIVE && !app->menuActive && IsWindowVisible(window)) app->hide();
         return 0;
     case WM_CLOSE: app->hide(); return 0;
-    case WM_TIMER: if (wParam == 10) app->animateTick(); return 0;
+    case WM_TIMER:
+        if (wParam == 10) app->animateTick();
+        else if (wParam == 20 && app->timedPause) { app->cancelTimedPause(); app->settings.paused = false; app->statusText.clear(); app->apply(false); }
+        return 0;
     case WM_DISPLAYCHANGE:
         app->refreshDisplays(); app->sync(); if (IsWindowVisible(window)) app->place(); return 0;
-    case WM_SETTINGCHANGE: case WM_THEMECHANGED: app->theme(); return 0;
+    case WM_SETTINGCHANGE: case WM_THEMECHANGED: app->theme(); if (app->preferences) app->preferences->refresh(true); return 0;
     case WM_DPICHANGED:
         app->dpi = HIWORD(wParam); app->fonts(); app->layout(); if (!app->placing) app->place(); return 0;
     case WM_MOUSEWHEEL:
-        app->setBrightness(app->brightness() + GET_WHEEL_DELTA_WPARAM(wParam) / WHEEL_DELTA * 2); app->apply(); return 0;
+        app->setBrightness(app->brightness() + GET_WHEEL_DELTA_WPARAM(wParam) / WHEEL_DELTA * app->settings.adjustmentStep); app->apply(); return 0;
     case screen::overlayFailure:
         app->settings.paused = true; app->statusText = L"Restored · try dimming again"; app->sync(); app->show(); return 0;
     case screen::settingsFailure:
         app->statusText = L"Preferences could not be saved"; app->sync(); return 0;
     case screen::coverageChanged:
         app->desktopCoverage = wParam != 0; app->sync(); return 0;
+    case screen::startupResult:
+        app->startupState = static_cast<screen::StartupState>(wParam);
+        if (app->preferences) app->preferences->startupState(app->startupState,false);
+        return 0;
     case WM_ERASEBKGND: return 1;
     case WM_PAINT: app->paint(); return 0;
     case WM_CTLCOLORSTATIC:
@@ -417,7 +453,7 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
     case WM_QUERYENDSESSION: return TRUE;
     case WM_ENDSESSION: if (wParam) DestroyWindow(window); return 0;
     case WM_DESTROY: {
-        KillTimer(window, 10); app->engine.reset();
+        KillTimer(window, 10); app->cancelTimedPause(); app->preferences.reset(); app->engine.reset();
         NOTIFYICONDATAW data{sizeof(data)}; data.hWnd = window; data.uID = 1; Shell_NotifyIconW(NIM_DELETE, &data);
         for (int id = 1; id <= 5; ++id) UnregisterHotKey(window, id);
         PostQuitMessage(0); return 0;
@@ -427,24 +463,31 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
 }
 }
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
+    bool background = false, overlayOnly = false, removeStartup = false, forcePaused = false;
+    int argumentCount = 0;
+    if (auto arguments = CommandLineToArgvW(GetCommandLineW(), &argumentCount)) {
+        for (int index = 1; index < argumentCount; ++index) {
+            const std::wstring_view argument(arguments[index]);
+            if (argument == L"--background") background = true;
+            if (argument == L"--overlay") overlayOnly = true;
+            if (argument == L"--remove-startup") removeStartup = true;
+            if (argument == L"--paused") forcePaused = true;
+        }
+        LocalFree(arguments);
+    }
+    if (removeStartup) return screen::removeStartupForCurrentExecutable() ? 0 : 1;
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     const auto mutex = CreateMutexW(nullptr, FALSE, L"Local\\Shardapps.Screen.Instance");
     if (!mutex) return 1;
     if (GetLastError() == ERROR_ALREADY_EXISTS) {
-        if (auto existing = FindWindowW(windowClass, nullptr)) PostMessageW(existing, showMessage, 0, 0);
+        if (!background) if (auto existing = FindWindowW(windowClass, nullptr)) PostMessageW(existing, showMessage, 0, 0);
         CloseHandle(mutex); return 0;
     }
     INITCOMMONCONTROLSEX controls{sizeof(controls), ICC_BAR_CLASSES | ICC_STANDARD_CLASSES}; InitCommonControlsEx(&controls);
     App app;
-    bool background = false;
-    int argumentCount = 0;
-    if (auto arguments = CommandLineToArgvW(GetCommandLineW(), &argumentCount)) {
-        for (int index = 1; index < argumentCount; ++index) {
-            if (std::wstring_view(arguments[index]) == L"--background") background = true;
-            if (std::wstring_view(arguments[index]) == L"--overlay") app.overlayOnly = true;
-        }
-        LocalFree(arguments);
-    }
+    app.selected = app.settings.selectedDisplay;
+    app.overlayOnly = overlayOnly;
+    if (forcePaused) app.settings.paused = true;
     WNDCLASSEXW type{sizeof(type)}; type.hInstance = instance; type.lpfnWndProc = windowProcedure;
     type.lpszClassName = windowClass; type.hCursor = LoadCursorW(nullptr, IDC_ARROW); type.style = CS_DROPSHADOW;
     type.hIcon = LoadIconW(instance, MAKEINTRESOURCEW(1));
@@ -458,6 +501,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
     if (!background || !app.trayPresent) app.show();
     MSG message{}; int result;
     while ((result = static_cast<int>(GetMessageW(&message, nullptr, 0, 0))) > 0) {
+        if (app.preferences && app.preferences->message(message)) continue;
         if (!IsDialogMessageW(window, &message)) { TranslateMessage(&message); DispatchMessageW(&message); }
     }
     if (IsWindow(window)) DestroyWindow(window);
