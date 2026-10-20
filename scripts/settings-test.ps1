@@ -143,11 +143,10 @@ function Capture-Slider([string]$name){
  [void][PreferencesTest]::ShowWindow($preferences,0)
  Send $window 0x8003
  Start-Sleep -Milliseconds 220
- # The isolated runner renders the real flyout at 300% for crisp gallery inserts.
- Send $window 0x02E0 (288 -bor (288 -shl 16))
+ # Keep the compact flyout at the runner's actual monitor DPI. Forcing an
+ # artificial DPI gets corrected by Windows when the tray flyout repositions.
  Capture $name $window $true
  Send $window 0x0010
- Send $window 0x02E0 (96 -bor (96 -shl 16))
  [void][PreferencesTest]::ShowWindow($preferences,4)
  Send $preferences 0x0111 1015
  Wait-SettingsFile 'brightness=100'
