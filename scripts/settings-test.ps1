@@ -83,7 +83,13 @@ function Open-Settings {
  if($script:preferences -eq [IntPtr]::Zero){throw 'Settings did not open'}
  if($StoreScreenshots){
   # Capture the actual rendered window at Store dimensions on the isolated CI desktop.
-  if(-not [PreferencesTest]::SetWindowPos($preferences,[IntPtr]::Zero,0,0,1440,900,0x0014)){throw 'Could not size Store capture window'}
+  $captureRect=[PreferencesTest+Rect]::new();$captureRect.Right=1440;$captureRect.Bottom=1340
+  $capturePointer=[Runtime.InteropServices.Marshal]::AllocHGlobal(16)
+  try{
+   [Runtime.InteropServices.Marshal]::StructureToPtr($captureRect,$capturePointer,$false)
+   # Render fonts and controls natively at 200%, rather than enlarging a bitmap.
+   Send $preferences 0x02E0 (192 -bor (192 -shl 16)) $capturePointer
+  }finally{[Runtime.InteropServices.Marshal]::FreeHGlobal($capturePointer)}
  }
  Start-Sleep -Milliseconds 100
 }
@@ -101,32 +107,49 @@ function Isolate-Overlays {
  }
  [void][PreferencesTest]::EnumWindows($callback,[IntPtr]::Zero)
 }
-function Capture([string]$name){
+function Capture([string]$name,[IntPtr]$target=$preferences,[bool]$raw=$false){
  if(-not $CaptureDirectory){return}
  [void][IO.Directory]::CreateDirectory($CaptureDirectory)
  # Start-Process hides the first ShowWindow call; explicitly show the capture target.
- [void][PreferencesTest]::ShowWindow($preferences,4)
- if(-not [PreferencesTest]::IsWindowVisible($preferences)){throw 'Settings capture target is hidden'}
+ [void][PreferencesTest]::ShowWindow($target,4)
+ if(-not [PreferencesTest]::IsWindowVisible($target)){throw 'Capture target is hidden'}
  Start-Sleep -Milliseconds 200
- [void][PreferencesTest]::RedrawWindow($preferences,[IntPtr]::Zero,[IntPtr]::Zero,0x0585)
+ [void][PreferencesTest]::RedrawWindow($target,[IntPtr]::Zero,[IntPtr]::Zero,0x0585)
  [void][PreferencesTest]::DwmFlush()
- $rect=[PreferencesTest+Rect]::new();[void][PreferencesTest]::GetWindowRect($preferences,[ref]$rect)
+ $rect=[PreferencesTest+Rect]::new();[void][PreferencesTest]::GetWindowRect($target,[ref]$rect)
  $bitmap=[Drawing.Bitmap]::new($rect.Right-$rect.Left,$rect.Bottom-$rect.Top)
  $graphics=[Drawing.Graphics]::FromImage($bitmap);$dc=$graphics.GetHdc()
  try{
-  if(-not [PreferencesTest]::PrintWindow($preferences,$dc,2)){
-   $source=[PreferencesTest]::GetWindowDC($preferences)
+  if(-not [PreferencesTest]::PrintWindow($target,$dc,2)){
+   $source=[PreferencesTest]::GetWindowDC($target)
    try{if(-not [PreferencesTest]::BitBlt($dc,0,0,$bitmap.Width,$bitmap.Height,$source,0,0,0x00CC0020)){throw 'Settings capture failed'}}
-   finally{[void][PreferencesTest]::ReleaseDC($preferences,$source)}
+   finally{[void][PreferencesTest]::ReleaseDC($target,$source)}
   }
  }finally{$graphics.ReleaseHdc($dc);$graphics.Dispose()}
  try{
-  if($StoreScreenshots -and ($bitmap.Width -lt 1366 -or $bitmap.Height -lt 768)){throw "Store screenshot is too small: $($bitmap.Width)x$($bitmap.Height)"}
+  if($StoreScreenshots -and -not $raw -and ($bitmap.Width -lt 1366 -or $bitmap.Height -lt 768)){throw "Store screenshot is too small: $($bitmap.Width)x$($bitmap.Height)"}
   $colors=[Collections.Generic.HashSet[int]]::new()
   for($y=0;$y -lt $bitmap.Height;$y+=17){for($x=0;$x -lt $bitmap.Width;$x+=17){[void]$colors.Add($bitmap.GetPixel($x,$y).ToArgb())}}
   if($colors.Count -lt 12){throw "Capture appears blank: $name ($($colors.Count) colors)"}
   $bitmap.Save((Join-Path $CaptureDirectory $name),[Drawing.Imaging.ImageFormat]::Png)
  }finally{$bitmap.Dispose()}
+}
+function Capture-Slider([string]$name){
+ if(-not $StoreScreenshots -or -not $CaptureDirectory){return}
+ $level=[PreferencesTest]::GetDlgItem($preferences,1011)
+ Send $level 0x0405 1 55;Send $preferences 0x0114 8 $level
+ Wait-SettingsFile 'brightness=55';Isolate-Overlays
+ [void][PreferencesTest]::ShowWindow($preferences,0)
+ Send $window 0x8003
+ Start-Sleep -Milliseconds 220
+ # The isolated runner renders the real flyout at 300% for crisp gallery inserts.
+ Send $window 0x02E0 (288 -bor (288 -shl 16))
+ Capture $name $window $true
+ Send $window 0x0010
+ Send $window 0x02E0 (96 -bor (96 -shl 16))
+ [void][PreferencesTest]::ShowWindow($preferences,4)
+ Send $preferences 0x0111 1015
+ Wait-SettingsFile 'brightness=100'
 }
 try{
  [void][PreferencesTest]::SetThreadDpiAwarenessContext([IntPtr](-4))
@@ -156,6 +179,7 @@ try{
   Send $preferences 0x0111 (1100+$theme);Wait-SettingsFile "theme=$theme";Start-Sleep -Milliseconds 50
   if((Read-Text ([PreferencesTest]::GetDlgItem($preferences,1100+$theme))) -notmatch 'selected'){throw 'Selected theme state missing'}
   Capture "settings-theme-$theme.png"
+  if($theme -in @(1,2,4)){Capture-Slider "slider-theme-$theme.png"}
  }
  Send $preferences 0x0111 1102;Wait-SettingsFile 'theme=2'
  Send $preferences 0x0111 1002;Start-Sleep -Milliseconds 130
