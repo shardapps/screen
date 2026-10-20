@@ -20,7 +20,7 @@ Software brightness control across your desktop, with smooth fades, per-monitor 
 
 Screen by **Shardapps** dims Windows desktop output using a full-desktop color transform, with click-through overlays for separate per-display levels and compatibility. Lower the slider to reduce perceived brightness across apps, including ordinary full-screen video app layers. It works independently of a monitor's brightness API and does not change hardware backlight settings.
 
-**Status: Alpha 1 (v1.0.0), being prepared for Microsoft Store certification.** The name **Screen Dimmer by Shardapps** is reserved under the registered publisher **ShardCoders**. CI produces per-user setup EXEs, portable ZIPs and Store packages. Unsigned MSIX files require Store signing and are not normal local installers. The Store submission is a draft; public availability will follow certification.
+**Status: Alpha 1 (v1.0.0), submitted for Microsoft Store certification on October 20, 2026.** **Screen Dimmer by Shardapps** is listed under the registered publisher **ShardCoders**. Microsoft Partner Center reports **In certification**, with automatic publication after approval. The app is not publicly available in the Store yet. CI produces per-user setup EXEs, portable ZIPs and Store packages. Unsigned MSIX files require Store signing and are not normal local installers.
 
 ## Built to stay out of your way
 
@@ -138,7 +138,7 @@ Portable builds use `%LOCALAPPDATA%\Shardapps\Screen\settings.ini`. Packaged Win
 
 **Is Screen available in the Microsoft Store?**
 
-Not yet. The repository includes MSIX packaging and [submission instructions](docs/STORE.md). A verified publisher identity, signing/submission, certification, and release QA are still required.
+Alpha 1 was submitted on October 20, 2026 and is **in certification**. It will publish automatically after Microsoft's approval. The [Store product link](https://apps.microsoft.com/detail/9PNHDHKMHDLG) may remain unavailable until publication. See [release evidence](docs/store/ALPHA_RELEASE.md) for validation and compatibility limits.
 
 ## Build and contribute
 

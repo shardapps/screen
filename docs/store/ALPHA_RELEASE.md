@@ -1,6 +1,17 @@
 # Alpha 1 release evidence
 
-The product name is **Screen Dimmer by Shardapps**. The reserved Store publisher is **ShardCoders**, product `9PNHDHKMHDLG`, package version `1.0.0.0`. The Store submission remains a draft until its status is explicitly updated here.
+The product name is **Screen Dimmer by Shardapps**. The Store publisher is **ShardCoders**, product `9PNHDHKMHDLG`, package version `1.0.0.0`.
+
+## Microsoft Store submission
+
+Submitted on **October 20, 2026**. Partner Center reports **In certification** for Submission 1 (`1152921505702173182`): submission complete, pre-processing in progress, certification and publishing next. It confirms the product will start publishing automatically after it passes certification. This records submission, not approval or public availability.
+
+- Both x64 and ARM64 MSIX packages passed Microsoft's package validation.
+- Pricing is free, with worldwide availability and a discoverable public listing.
+- The English (United States) listing includes the description, use cases, eight features, seven keywords, four captioned native screenshots and the 300 px Store icon.
+- Properties, privacy policy and age ratings are complete. IARC generated Everyone / 3+ ratings; its terms and age-of-majority declaration were accepted with the publisher's explicit confirmation.
+- Reviewer instructions explain desktop color processing, per-monitor overlay limits, optional startup, emergency restore and the absence of personal-data collection. Partner Center requires a privacy policy based on package capabilities, so the public policy is supplied.
+- [Store product page](https://apps.microsoft.com/detail/9PNHDHKMHDLG) may remain unavailable until publication.
 
 ## Reproducible validation
 
