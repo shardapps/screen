@@ -2,7 +2,7 @@
 param(
     [Parameter(Mandatory)][ValidateSet('x64', 'arm64')][string]$Architecture,
     [Parameter(Mandatory)][string]$Executable,
-    [ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version = '0.4.0',
+    [ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version = '1.0.0',
     [string]$OutputDirectory = 'dist',
     [string]$InnoCompiler
 )

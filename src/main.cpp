@@ -109,7 +109,7 @@ struct App {
         if (preferences) preferences->refresh();
         if (trayPresent && !tracking) {
             NOTIFYICONDATAW data{sizeof(data)}; data.hWnd = window; data.uID = 1; data.uFlags = NIF_TIP;
-            const auto tip = settings.paused ? std::wstring(L"Screen by Shardapps · Paused") : settings.monitors.empty() ?
+            const auto tip = settings.paused ? std::wstring(L"Screen Dimmer by Shardapps · Paused") : settings.monitors.empty() ?
                 L"Screen · " + std::to_wstring(settings.brightness) + L"% · " + shortcutText :
                 L"Screen · Per-display dimming · " + shortcutText;
             wcscpy_s(data.szTip, tip.c_str()); Shell_NotifyIconW(NIM_MODIFY, &data);
@@ -129,7 +129,7 @@ struct App {
         NOTIFYICONDATAW data{sizeof(data)};
         data.hWnd = window; data.uID = 1; data.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP | NIF_SHOWTIP;
         data.hIcon = icon; data.uCallbackMessage = trayMessage;
-        wcscpy_s(data.szTip, L"Screen by Shardapps");
+        wcscpy_s(data.szTip, L"Screen Dimmer by Shardapps");
         trayPresent = Shell_NotifyIconW(NIM_ADD, &data) != FALSE;
         if (trayPresent) { data.uVersion = NOTIFYICON_VERSION_4; Shell_NotifyIconW(NIM_SETVERSION, &data); }
         return trayPresent;
@@ -463,7 +463,7 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
 }
 }
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
-    bool background = false, overlayOnly = false, removeStartup = false, forcePaused = false;
+    bool background = false, overlayOnly = false, removeStartup = false, forcePaused = false, openSettings = false;
     int argumentCount = 0;
     if (auto arguments = CommandLineToArgvW(GetCommandLineW(), &argumentCount)) {
         for (int index = 1; index < argumentCount; ++index) {
@@ -472,6 +472,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
             if (argument == L"--overlay") overlayOnly = true;
             if (argument == L"--remove-startup") removeStartup = true;
             if (argument == L"--paused") forcePaused = true;
+            if (argument == L"--settings") openSettings = true;
         }
         LocalFree(arguments);
     }
@@ -480,7 +481,10 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
     const auto mutex = CreateMutexW(nullptr, FALSE, L"Local\\Shardapps.Screen.Instance");
     if (!mutex) return 1;
     if (GetLastError() == ERROR_ALREADY_EXISTS) {
-        if (!background) if (auto existing = FindWindowW(windowClass, nullptr)) PostMessageW(existing, showMessage, 0, 0);
+        if (auto existing = FindWindowW(windowClass, nullptr)) {
+            if (openSettings) PostMessageW(existing, WM_COMMAND, preferencesId, 0);
+            else if (!background) PostMessageW(existing, showMessage, 0, 0);
+        }
         CloseHandle(mutex); return 0;
     }
     INITCOMMONCONTROLSEX controls{sizeof(controls), ICC_BAR_CLASSES | ICC_STANDARD_CLASSES}; InitCommonControlsEx(&controls);
@@ -495,10 +499,11 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
     const auto dpi = GetDpiForSystem(); RECT work{}; SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
     const auto width = MulDiv(panelWidth, static_cast<int>(dpi), 96), height = MulDiv(panelHeight, static_cast<int>(dpi), 96);
     const auto window = CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_LAYERED,
-        windowClass, L"Screen by Shardapps", WS_POPUP | WS_CLIPCHILDREN,
+        windowClass, L"Screen Dimmer by Shardapps", WS_POPUP | WS_CLIPCHILDREN,
         work.right - width - 12, work.bottom - height - 12, width, height, nullptr, nullptr, instance, &app);
     if (!window) { CloseHandle(mutex); return 1; }
-    if (!background || !app.trayPresent) app.show();
+    if (openSettings) app.openPreferences();
+    else if (!background || !app.trayPresent) app.show();
     MSG message{}; int result;
     while ((result = static_cast<int>(GetMessageW(&message, nullptr, 0, 0))) > 0) {
         if (app.preferences && app.preferences->message(message)) continue;

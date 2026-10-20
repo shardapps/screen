@@ -30,7 +30,7 @@ public static class ScreenSmoke {
 }
 '@
 $binary = (Resolve-Path -LiteralPath $Executable).Path
-if ([ScreenSmoke]::FindWindow('Shardapps.Screen.Control', 'Screen by Shardapps') -ne [IntPtr]::Zero) {
+if ([ScreenSmoke]::FindWindow('Shardapps.Screen.Control', 'Screen Dimmer by Shardapps') -ne [IntPtr]::Zero) {
     throw 'Close the running Screen app before running this isolated smoke test.'
 }
 $settingsFile = Join-Path $env:LOCALAPPDATA 'Shardapps\Screen\settings.ini'
@@ -89,7 +89,7 @@ try {
     $window = [IntPtr]::Zero
     for ($i = 0; $i -lt 100 -and $window -eq [IntPtr]::Zero; $i++) {
         Start-Sleep -Milliseconds 100
-        $window = [ScreenSmoke]::FindWindow('Shardapps.Screen.Control', 'Screen by Shardapps')
+        $window = [ScreenSmoke]::FindWindow('Shardapps.Screen.Control', 'Screen Dimmer by Shardapps')
         if ($process.HasExited) { throw 'Screen exited before creating its control window.' }
     }
     if ($window -eq [IntPtr]::Zero) { throw 'No control window within 10 seconds.' }

@@ -1,0 +1,48 @@
+{
+  "title": "Screen Dimmer by Shardapps",
+  "channel": "Alpha 1",
+  "shortDescription": "Dim your Windows 11 desktop with a tiny tray slider, per-screen controls, six themes and optional startup.",
+  "description": "Make a bright desktop feel softer with Screen Dimmer by Shardapps, a small, open-source screen dimmer for Windows 11.\n\nOpen the compact slider with Alt+S, choose your preferred brightness, and get back to work. Adjust all displays together or select one monitor. No account is needed, and the app works offline.\n\nUSE IT FOR\n• A gentler desktop during late-night reading, coding or study.\n• External monitors that still look too bright at their lowest hardware setting.\n• Matching the perceived brightness of different screens.\n• Quickly dimming a workspace, pausing for 15 minutes, or restoring every display.\n\nSMALL CONTROLS, USEFUL OPTIONS\n• A compact flyout above the taskbar and a quiet system tray home.\n• Screen selection, screen identification and brightness presets.\n• Six palettes: Pearl, Midnight, Graphite, Ocean, Forest and Sunset, plus System.\n• Smooth brightness changes and short transitions that respect Windows animation settings.\n• Optional warm tint, configurable shortcut and adjustment step.\n• Opt-in Windows startup, with a separate option to resume saved dimming.\n• Immediate emergency restore with Ctrl+Alt+Shift+F12.\n\nBuilt with native Windows APIs, without a bundled browser runtime. No advertising, telemetry, screen recording or keystroke recording. Preferences stay on your device.\n\nALPHA RELEASE\nThis is our first Microsoft Store alpha. Feedback and reproducible compatibility reports help shape the next release. The source and issue tracker are available at https://github.com/shardapps/screen.\n\nScreen Dimmer changes perceived brightness through software. It does not change a monitor's physical backlight or promise battery savings. Uniform all-display dimming uses Windows desktop color processing; separate monitor levels use compatibility overlays with narrower full-screen coverage. HDR, protected video, remote sessions and true exclusive full-screen games vary by environment. Windows sign-in, lock and UAC secure screens are outside the app's scope.\n\nWorks on Windows 11 desktop PCs, with x64 and ARM64 packages.",
+  "releaseNotes": "Alpha 1 — first Microsoft Store release. Includes the compact brightness flyout, per-screen controls, six palettes plus System, presets, a 15-minute pause, warm tint, configurable shortcut/step, opt-in startup and saved-dimming resume. Please report compatibility issues with your Windows version, display setup and reproducible steps.",
+  "features": [
+    "Compact brightness slider with Alt+S access and system tray controls",
+    "Adjust all displays or choose one screen; identify connected displays",
+    "Six themes plus System, with Windows high-contrast priority",
+    "Smooth transitions that respect Windows animation preferences",
+    "Brightness presets, optional warm tint and a 15-minute pause",
+    "Opt-in Windows startup and separate saved-dimming resume",
+    "Configurable opening shortcut and adjustment step",
+    "Offline and open source, with no ads, account or telemetry"
+  ],
+  "keywords": [
+    "screen dimmer",
+    "brightness control",
+    "screen brightness",
+    "external monitor dimmer",
+    "multi monitor dimming",
+    "night screen dimmer",
+    "desktop dimmer"
+  ],
+  "privacyUrl": "https://github.com/shardapps/screen/blob/main/PRIVACY.md",
+  "supportUrl": "https://github.com/shardapps/screen/issues",
+  "websiteUrl": "https://github.com/shardapps/screen",
+  "screenshots": [
+    {
+      "file": "01-displays.png",
+      "caption": "Choose a display, adjust brightness and apply a preset from native settings."
+    },
+    {
+      "file": "02-appearance.png",
+      "caption": "Choose Pearl, Midnight, Graphite, Ocean, Forest or Sunset, or follow System."
+    },
+    {
+      "file": "03-preferences.png",
+      "caption": "Control optional startup, saved-dimming resume, smooth transitions and keyboard preferences."
+    },
+    {
+      "file": "04-pearl.png",
+      "caption": "Choose a light Pearl palette, or switch to one of six color themes plus System."
+    }
+  ],
+  "certificationNotes": "Native C++20 Win32 utility. No login or test account is required. Starts paused by default; move the slider to enable dimming. Alt+S opens the flyout; a settings icon opens Displays, Appearance and Preferences. The runFullTrust capability is required for the normal Win32 desktop process, global shortcuts, per-display click-through windows and Windows Magnification full-desktop color processing. It does not request elevation, install a driver/service, inject code, capture the screen, record keys or access the secure desktop. The StartupTask is disabled by default and only enabled through an explicit user preference. Saved-dimming resume is a separate opt-in. Emergency restore: Ctrl+Alt+Shift+F12. Select All displays and adjust the slider for uniform desktop color processing. Per-display differences or an unavailable/busy color API use compatibility overlays. Quit from the tray menu to restore the desktop. Windows 11 desktop target; x64 and ARM64 builds."
+}

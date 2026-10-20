@@ -19,7 +19,7 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 $testId = [guid]::NewGuid().ToString('N')
 $installRoot = Join-Path $projectRoot "build\installer-test-$testId"
 $group = "Shardapps Screen Test $testId"
-$shortcut = Join-Path ([Environment]::GetFolderPath('Programs')) "$group\Screen by Shardapps.lnk"
+$shortcut = Join-Path ([Environment]::GetFolderPath('Programs')) "$group\Screen Dimmer by Shardapps.lnk"
 $uninstaller = Join-Path $installRoot 'unins000.exe'
 function Invoke-Setup {
     $arguments = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', ('/DIR="' + $installRoot + '"'), ('/GROUP="' + $group + '"'))

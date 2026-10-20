@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([Parameter(Mandatory)][string]$Executable,[string]$CaptureDirectory)
+param([Parameter(Mandatory)][string]$Executable,[string]$CaptureDirectory,[switch]$StoreScreenshots)
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Drawing
 Add-Type @'
@@ -17,6 +17,7 @@ public static class PreferencesTest {
  [DllImport("user32.dll")]public static extern bool EnumWindows(EnumProc callback,IntPtr data);
  [DllImport("user32.dll")]public static extern bool GetWindowRect(IntPtr hwnd,out Rect rect);
  [DllImport("user32.dll")]public static extern bool IsWindowVisible(IntPtr hwnd);
+ [DllImport("user32.dll")]public static extern bool ShowWindow(IntPtr hwnd,int command);
  [DllImport("user32.dll")]public static extern bool IsWindow(IntPtr hwnd);
  [DllImport("user32.dll")]public static extern bool IsWindowEnabled(IntPtr hwnd);
  [DllImport("user32.dll")]public static extern bool SetWindowPos(IntPtr hwnd,IntPtr after,int x,int y,int w,int h,uint flags);
@@ -36,7 +37,7 @@ public static class PreferencesTest {
 }
 '@
 $binary=(Resolve-Path -LiteralPath $Executable).Path
-if([PreferencesTest]::FindWindow('Shardapps.Screen.Control','Screen by Shardapps') -ne [IntPtr]::Zero){throw 'Close Screen before isolated settings tests.'}
+if([PreferencesTest]::FindWindow('Shardapps.Screen.Control','Screen Dimmer by Shardapps') -ne [IntPtr]::Zero){throw 'Close Screen before isolated settings tests.'}
 $settingsFile=Join-Path $env:LOCALAPPDATA 'Shardapps/Screen/settings.ini'
 $hadSettings=Test-Path -LiteralPath $settingsFile
 $savedBytes=if($hadSettings){[IO.File]::ReadAllBytes($settingsFile)}else{$null}
@@ -70,7 +71,7 @@ function Start-Screen([bool]$paused=$true){
  $script:process=Start-Process -FilePath $binary -ArgumentList $arguments -WindowStyle Hidden -PassThru
  $script:window=[IntPtr]::Zero
  for($attempt=0;$attempt -lt 100 -and $script:window -eq [IntPtr]::Zero;$attempt++){
-  Start-Sleep -Milliseconds 50;$script:window=[PreferencesTest]::FindWindow('Shardapps.Screen.Control','Screen by Shardapps')
+  Start-Sleep -Milliseconds 50;$script:window=[PreferencesTest]::FindWindow('Shardapps.Screen.Control','Screen Dimmer by Shardapps')
   if($script:process.HasExited){throw 'Screen exited at startup'}
  }
  if($script:window -eq [IntPtr]::Zero){throw 'No control window'}
@@ -78,8 +79,12 @@ function Start-Screen([bool]$paused=$true){
 }
 function Open-Settings {
  Send $window 0x0111 111
- $script:preferences=[PreferencesTest]::FindWindow('Shardapps.Screen.Settings','Screen settings')
+ $script:preferences=[PreferencesTest]::FindWindow('Shardapps.Screen.Settings','Screen Dimmer settings')
  if($script:preferences -eq [IntPtr]::Zero){throw 'Settings did not open'}
+ if($StoreScreenshots){
+  # Capture the actual rendered window at Store dimensions on the isolated CI desktop.
+  if(-not [PreferencesTest]::SetWindowPos($preferences,[IntPtr]::Zero,0,0,1440,900,0x0014)){throw 'Could not size Store capture window'}
+ }
  Start-Sleep -Milliseconds 100
 }
 function Quit-Screen {
@@ -99,6 +104,9 @@ function Isolate-Overlays {
 function Capture([string]$name){
  if(-not $CaptureDirectory){return}
  [void][IO.Directory]::CreateDirectory($CaptureDirectory)
+ # Start-Process hides the first ShowWindow call; explicitly show the capture target.
+ [void][PreferencesTest]::ShowWindow($preferences,4)
+ if(-not [PreferencesTest]::IsWindowVisible($preferences)){throw 'Settings capture target is hidden'}
  Start-Sleep -Milliseconds 200
  [void][PreferencesTest]::RedrawWindow($preferences,[IntPtr]::Zero,[IntPtr]::Zero,0x0585)
  [void][PreferencesTest]::DwmFlush()
@@ -112,7 +120,13 @@ function Capture([string]$name){
    finally{[void][PreferencesTest]::ReleaseDC($preferences,$source)}
   }
  }finally{$graphics.ReleaseHdc($dc);$graphics.Dispose()}
- try{$bitmap.Save((Join-Path $CaptureDirectory $name),[Drawing.Imaging.ImageFormat]::Png)}finally{$bitmap.Dispose()}
+ try{
+  if($StoreScreenshots -and ($bitmap.Width -lt 1366 -or $bitmap.Height -lt 768)){throw "Store screenshot is too small: $($bitmap.Width)x$($bitmap.Height)"}
+  $colors=[Collections.Generic.HashSet[int]]::new()
+  for($y=0;$y -lt $bitmap.Height;$y+=17){for($x=0;$x -lt $bitmap.Width;$x+=17){[void]$colors.Add($bitmap.GetPixel($x,$y).ToArgb())}}
+  if($colors.Count -lt 12){throw "Capture appears blank: $name ($($colors.Count) colors)"}
+  $bitmap.Save((Join-Path $CaptureDirectory $name),[Drawing.Imaging.ImageFormat]::Png)
+ }finally{$bitmap.Dispose()}
 }
 try{
  [void][PreferencesTest]::SetThreadDpiAwarenessContext([IntPtr](-4))
@@ -191,6 +205,12 @@ try{
  Send $preferences 0x0111 1001
  if((Read-Text ([PreferencesTest]::GetDlgItem($preferences,1102))) -notmatch 'selected'){throw 'Theme did not survive restart'}
  Quit-Screen
+ # Direct settings access works without needing the transient tray flyout.
+ $process=Start-Process -FilePath $binary -ArgumentList '--settings','--paused' -WindowStyle Hidden -PassThru
+ $preferences=[IntPtr]::Zero
+ for($attempt=0;$attempt -lt 100 -and $preferences -eq [IntPtr]::Zero;$attempt++){Start-Sleep -Milliseconds 50;$preferences=[PreferencesTest]::FindWindow('Shardapps.Screen.Settings','Screen Dimmer settings')}
+ if($preferences -eq [IntPtr]::Zero){throw 'Direct settings launch failed'}
+ $window=[PreferencesTest]::FindWindow('Shardapps.Screen.Control','Screen Dimmer by Shardapps');Quit-Screen
  # Uninstall cleanup removes only the registration for this executable.
  $key=[Microsoft.Win32.Registry]::CurrentUser.CreateSubKey($runPath);$key.SetValue($runName,$expected);$key.Dispose()
  $cleanup=Start-Process -FilePath $binary -ArgumentList '--remove-startup' -WindowStyle Hidden -PassThru
@@ -206,7 +226,7 @@ try{
   $launcher=Start-Process -FilePath $helper -WindowStyle Hidden -PassThru
   if(-not $launcher.WaitForExit(5000) -or $launcher.ExitCode -ne 0){throw 'Startup helper failed'}
   $window=[IntPtr]::Zero
-  for($attempt=0;$attempt -lt 100 -and $window -eq [IntPtr]::Zero;$attempt++){Start-Sleep -Milliseconds 50;$window=[PreferencesTest]::FindWindow('Shardapps.Screen.Control','Screen by Shardapps')}
+  for($attempt=0;$attempt -lt 100 -and $window -eq [IntPtr]::Zero;$attempt++){Start-Sleep -Milliseconds 50;$window=[PreferencesTest]::FindWindow('Shardapps.Screen.Control','Screen Dimmer by Shardapps')}
   if($window -eq [IntPtr]::Zero){throw 'Startup helper did not launch Screen'}
   [uint32]$appProcessId=0;[void][PreferencesTest]::GetWindowThreadProcessId($window,[ref]$appProcessId);$process=Get-Process -Id $appProcessId
   Start-Sleep -Milliseconds 200

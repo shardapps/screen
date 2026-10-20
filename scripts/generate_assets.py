@@ -42,7 +42,7 @@ def png(size: int) -> bytes:
 def main():
     assets = ROOT / 'packaging' / 'Assets'
     assets.mkdir(parents=True, exist_ok=True)
-    for name, size in [('Square44x44Logo.png', 44), ('Square150x150Logo.png', 150), ('StoreLogo.png', 50)]:
+    for name, size in [('Square44x44Logo.png', 44), ('Square150x150Logo.png', 150), ('StoreLogo.png', 50), ('StoreTile300.png', 300)]:
         (assets / name).write_bytes(png(size))
     sizes = [16, 32, 48, 256]
     images = [png(size) for size in sizes]

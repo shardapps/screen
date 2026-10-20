@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.0 — Alpha 1
+
+- Prepare the first Microsoft Store alpha as Screen Dimmer by Shardapps.
+- Use the reserved Store product identity, x64/ARM64 packages and opt-in startup task.
+- Add Store listing copy, real screenshots, a 300 px tile and separate promotional artwork.
+- Preserve existing local preferences and the familiar compact controls.
+
+
 ## 0.4.0 — 2026-10-19
 
 - Add on-demand Displays, Appearance and Preferences settings, plus a direct flyout screen picker.
