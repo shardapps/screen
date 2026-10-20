@@ -83,12 +83,13 @@ function Open-Settings {
  if($script:preferences -eq [IntPtr]::Zero){throw 'Settings did not open'}
  if($StoreScreenshots){
   # Capture the actual rendered window at Store dimensions on the isolated CI desktop.
-  $captureRect=[PreferencesTest+Rect]::new();$captureRect.Right=1440;$captureRect.Bottom=1340
+  $captureRect=[PreferencesTest+Rect]::new();$captureRect.Right=1440;$captureRect.Bottom=1040
   $capturePointer=[Runtime.InteropServices.Marshal]::AllocHGlobal(16)
   try{
    [Runtime.InteropServices.Marshal]::StructureToPtr($captureRect,$capturePointer,$false)
-   # Render fonts and controls natively at 200%, rather than enlarging a bitmap.
-   Send $preferences 0x02E0 (192 -bor (192 -shl 16)) $capturePointer
+   # Render fonts and controls natively at 150%, fitting every page on the
+   # hosted runner's supported 1080p display rather than enlarging a bitmap.
+   Send $preferences 0x02E0 (144 -bor (144 -shl 16)) $capturePointer
   }finally{[Runtime.InteropServices.Marshal]::FreeHGlobal($capturePointer)}
  }
  Start-Sleep -Milliseconds 100
