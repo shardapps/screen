@@ -4,14 +4,14 @@ The product name is **Screen Dimmer by Shardapps**. The Store publisher is **Sha
 
 ## Microsoft Store submission
 
-Submitted on **October 20, 2026**. Partner Center reports **In certification** for Submission 1 (`1152921505702173182`): submission complete, pre-processing in progress, certification and publishing next. It confirms the product will start publishing automatically after it passes certification. This records submission, not approval or public availability.
+Submitted on **October 20, 2026**. Partner Center now confirms **In Microsoft Store** for Submission 1 (`1152921505702173182`) and states the product is available based on its configured discoverability. The original app release is live. The gallery refresh is tracked separately in [gallery-v2](gallery-v2/README.md).
 
 - Both x64 and ARM64 MSIX packages passed Microsoft's package validation.
 - Pricing is free, with worldwide availability and a discoverable public listing.
 - The English (United States) listing includes the description, use cases, eight features, seven keywords, four captioned native screenshots and the 300 px Store icon.
 - Properties, privacy policy and age ratings are complete. IARC generated Everyone / 3+ ratings; its terms and age-of-majority declaration were accepted with the publisher's explicit confirmation.
 - Reviewer instructions explain desktop color processing, per-monitor overlay limits, optional startup, emergency restore and the absence of personal-data collection. Partner Center requires a privacy policy based on package capabilities, so the public policy is supplied.
-- [Store product page](https://apps.microsoft.com/detail/9PNHDHKMHDLG) may remain unavailable until publication.
+- [Store product page](https://apps.microsoft.com/detail/9PNHDHKMHDLG).
 
 ## Reproducible validation
 
@@ -30,6 +30,6 @@ Submitted on **October 20, 2026**. Partner Center reports **In certification** f
 
 Release review covered package identity/version consistency, preservation of settings/startup identifiers, normal-user permissions, explicit startup consent, native settings lifetime and direct settings launch. No new runtime dependency, network client, secret, elevation, driver or service is introduced. Store package signing is left to Microsoft's distribution process.
 
-This is alpha validation, not a claim that every item in the broader release checklist has passed. Physical ARM64 behavior, broad GPU/HDR/protected-video/exclusive-fullscreen combinations, real sign-in StartupTask delivery and the full manual accessibility matrix remain unverified for this release. Windows App Certification Kit has not completed on these unsigned Store packages; no local certificate trust or Windows security policy was changed. Microsoft certification is still required. Listing copy calls out software brightness and coverage limits.
+This is alpha validation, not a claim that every item in the broader release checklist has passed. Physical ARM64 behavior, broad GPU/HDR/protected-video/exclusive-fullscreen combinations, real sign-in StartupTask delivery and the full manual accessibility matrix remain unverified for this release. Windows App Certification Kit was not completed locally on these unsigned Store packages; no local certificate trust or Windows security policy was changed. The original submission subsequently passed Store publication. Listing copy calls out software brightness and coverage limits.
 
 `alpha-promo.png` is generated marketing artwork, not an app screenshot. Its dimensions do not match Store's optional hero slot, so it is not used for that slot. `alpha-art-prompt.md` records the built-in ImageGen prompt. The Store tile is the deterministic 300 px app icon.
