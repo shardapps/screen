@@ -129,7 +129,8 @@ function Capture([string]$name,[IntPtr]$target=$preferences,[bool]$raw=$false){
  try{
   if($StoreScreenshots -and -not $raw -and ($bitmap.Width -lt 1366 -or $bitmap.Height -lt 768)){throw "Store screenshot is too small: $($bitmap.Width)x$($bitmap.Height)"}
   $colors=[Collections.Generic.HashSet[int]]::new()
-  for($y=0;$y -lt $bitmap.Height;$y+=17){for($x=0;$x -lt $bitmap.Width;$x+=17){[void]$colors.Add($bitmap.GetPixel($x,$y).ToArgb())}}
+  $stride=if($raw){3}else{17}
+  for($y=0;$y -lt $bitmap.Height;$y+=$stride){for($x=0;$x -lt $bitmap.Width;$x+=$stride){[void]$colors.Add($bitmap.GetPixel($x,$y).ToArgb())}}
   if($colors.Count -lt 12){throw "Capture appears blank: $name ($($colors.Count) colors)"}
   $bitmap.Save((Join-Path $CaptureDirectory $name),[Drawing.Imaging.ImageFormat]::Png)
  }finally{$bitmap.Dispose()}
