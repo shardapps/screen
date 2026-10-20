@@ -1,6 +1,6 @@
 <div align="center">
 
-![Screen Dimmer by Shardapps — lightweight Windows 11 screen dimmer](docs/assets/hero.svg)
+![Screen Dimmer by Shardapps — compact brightness slider, enlarged promotional presentation](docs/store/gallery-v2/01-slider.png)
 
 # Screen — a lightweight screen dimmer for Windows 11
 
@@ -20,7 +20,7 @@ Software brightness control across your desktop, with smooth fades, per-monitor 
 
 Screen by **Shardapps** dims Windows desktop output using a full-desktop color transform, with click-through overlays for separate per-display levels and compatibility. Lower the slider to reduce perceived brightness across apps, including ordinary full-screen video app layers. It works independently of a monitor's brightness API and does not change hardware backlight settings.
 
-**Status: Alpha 1 (v1.0.0), submitted for Microsoft Store certification on October 20, 2026.** **Screen Dimmer by Shardapps** is listed under the registered publisher **ShardCoders**. Microsoft Partner Center reports **In certification**, with automatic publication after approval. The app is not publicly available in the Store yet. CI produces per-user setup EXEs, portable ZIPs and Store packages. Unsigned MSIX files require Store signing and are not normal local installers.
+**Status: Alpha 1 (v1.0.0), available in the [Microsoft Store](https://apps.microsoft.com/detail/9PNHDHKMHDLG).** **Screen Dimmer by Shardapps** is listed under the registered publisher **ShardCoders**. CI also produces per-user setup EXEs, portable ZIPs and Store packages. Unsigned MSIX files require Store signing and are not normal local installers.
 
 ## Built to stay out of your way
 
@@ -138,7 +138,7 @@ Portable builds use `%LOCALAPPDATA%\Shardapps\Screen\settings.ini`. Packaged Win
 
 **Is Screen available in the Microsoft Store?**
 
-Alpha 1 was submitted on October 20, 2026 and is **in certification**. It will publish automatically after Microsoft's approval. The [Store product link](https://apps.microsoft.com/detail/9PNHDHKMHDLG) may remain unavailable until publication. See [release evidence](docs/store/ALPHA_RELEASE.md) for validation and compatibility limits.
+Yes. Get **Screen Dimmer by Shardapps** from the [Microsoft Store](https://apps.microsoft.com/detail/9PNHDHKMHDLG), under publisher **ShardCoders**. See [release evidence](docs/store/ALPHA_RELEASE.md) for validation and compatibility limits.
 
 ## Build and contribute
 

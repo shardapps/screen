@@ -1,0 +1,51 @@
+[
+  {
+    "file": "01-slider.png",
+    "width": 1672,
+    "height": 941,
+    "bytes": 1714237,
+    "sha256": "dd542b521c869d5c15761b93e3f0e90e358c499a9aea87ece92b855ecdfc4ddd"
+  },
+  {
+    "file": "02-themes.png",
+    "width": 1672,
+    "height": 941,
+    "bytes": 1467251,
+    "sha256": "1e2e8bb64a9b6f3ca0d24897d2dc50a56ccefb5805b19f389017a9f3c5f4960f"
+  },
+  {
+    "file": "03-displays.png",
+    "width": 1440,
+    "height": 1040,
+    "bytes": 37086,
+    "sha256": "1b2c912890667c1ecc7619b42afe19acf236285dd065e980d4e08f51d282da16"
+  },
+  {
+    "file": "04-appearance.png",
+    "width": 1440,
+    "height": 1040,
+    "bytes": 39562,
+    "sha256": "b966bf005a1420ca4e74fb3ca7f5067c848e50aaa50c4e384aea4afbfdad044b"
+  },
+  {
+    "file": "05-preferences.png",
+    "width": 1440,
+    "height": 1040,
+    "bytes": 40542,
+    "sha256": "021d5015af0d2c0c9528d6e677fc130f1cfe854280316df84fda970d73db243e"
+  },
+  {
+    "file": "brand-card.png",
+    "width": 1672,
+    "height": 941,
+    "bytes": 1767033,
+    "sha256": "0fb6bd827b8da8832ef50e0b4cceb5b118e4a50ab812b3cd4d93e6ce1da7493c"
+  },
+  {
+    "file": "crescent-art.png",
+    "width": 1672,
+    "height": 941,
+    "bytes": 1718471,
+    "sha256": "d4a44c5a1eb21ac28d3ef9ffdd9d8fdd7e94101fd4b4b3b909871eb804d82c3f"
+  }
+]

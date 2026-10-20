@@ -28,20 +28,24 @@
   "websiteUrl": "https://github.com/shardapps/screen",
   "screenshots": [
     {
-      "file": "01-displays.png",
-      "caption": "Choose a display, adjust brightness and apply a preset from native settings."
+      "file": "gallery-v2/01-slider.png",
+      "caption": "Open the compact brightness slider with Alt+S. Enlarged promotional presentation of the Midnight interface."
     },
     {
-      "file": "02-appearance.png",
-      "caption": "Choose Pearl, Midnight, Graphite, Ocean, Forest or Sunset, or follow System."
+      "file": "gallery-v2/02-themes.png",
+      "caption": "Pearl and Ocean compact sliders. Enlarged promotional presentations; six themes plus System are available."
     },
     {
-      "file": "03-preferences.png",
-      "caption": "Control optional startup, saved-dimming resume, smooth transitions and keyboard preferences."
+      "file": "gallery-v2/03-displays.png",
+      "caption": "Choose a screen, set brightness, use presets or pause dimming from native Displays settings."
     },
     {
-      "file": "04-pearl.png",
-      "caption": "Choose a light Pearl palette, or switch to one of six color themes plus System."
+      "file": "gallery-v2/04-appearance.png",
+      "caption": "Native Appearance settings: six color themes plus System, with Windows high-contrast priority."
+    },
+    {
+      "file": "gallery-v2/05-preferences.png",
+      "caption": "Native Preferences settings: optional startup, saved-dimming resume, transitions, warmth and keyboard controls."
     }
   ],
   "certificationNotes": "Native C++20 Win32 utility. No login or test account is required. Starts paused by default; move the slider to enable dimming. Alt+S opens the flyout; a settings icon opens Displays, Appearance and Preferences. The runFullTrust capability is required for the normal Win32 desktop process, global shortcuts, per-display click-through windows and Windows Magnification full-desktop color processing. It does not request elevation, install a driver/service, inject code, capture the screen, record keys or access the secure desktop. The StartupTask is disabled by default and only enabled through an explicit user preference. Saved-dimming resume is a separate opt-in. Emergency restore: Ctrl+Alt+Shift+F12. Select All displays and adjust the slider for uniform desktop color processing. Per-display differences or an unavailable/busy color API use compatibility overlays. Quit from the tray menu to restore the desktop. Windows 11 desktop target; x64 and ARM64 builds."
