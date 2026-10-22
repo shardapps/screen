@@ -13,10 +13,13 @@ std::filesystem::path settingsPath() {
     return path / L"Shardapps" / L"Screen" / L"settings.ini";
 }
 Settings loadSettings() {
-    Settings result;
     const auto path = settingsPath();
-    if (path.empty()) return result;
+    if (path.empty()) return {};
     std::wifstream input(path);
+    return parseSettings(input);
+}
+Settings parseSettings(std::wistream& input) {
+    Settings result;
     std::wstring line;
     while (std::getline(input, line)) {
         const auto split = line.find(L'=');
@@ -35,10 +38,40 @@ Settings loadSettings() {
         else if (key == L"step") result.adjustmentStep = value==1 || value==2 || value==5 || value==10 ? value : 5;
         else if (key == L"shortcut") result.openingShortcut = std::clamp(value, 0, 2);
         else if (key == L"resume") result.resumeOnLaunch = value == 1;
+        else if (key == L"separateDesktops") result.separateDesktops = value == 1;
+        else if (key.starts_with(L"desktop:") && key.size() > 47) {
+            const auto id = key.substr(8,38);
+            if (key[46] != L':') continue;
+            const auto field = key.substr(47);
+            if (field != L"brightness" && !(field.starts_with(L"monitor:") && field.size() > 8 && field.size() <= 136)) continue;
+            if (!validDesktopId(id) || (result.desktops.size() >= maxDesktopProfiles && !result.desktops.contains(id))) continue;
+            auto* profile = &result.desktops[id];
+            if (field == L"brightness") profile->brightness = clampBrightness(value);
+            else if (profile->monitors.size() < 32 || profile->monitors.contains(field.substr(8)))
+                profile->monitors[field.substr(8)] = clampBrightness(value);
+        }
         else if (key.starts_with(L"monitor:")) result.monitors[key.substr(8)] = clampBrightness(value);
     }
     result.paused = !result.resumeOnLaunch;
     return result;
+}
+void writeSettings(std::wostream& output, const Settings& settings) {
+            output << L"brightness=" << settings.brightness << L'\n'
+                   << L"warm=" << settings.warm << L'\n'
+                   << L"smooth=" << settings.smooth << L'\n'
+                   << L"theme=" << settings.theme << L'\n'
+                   << L"step=" << settings.adjustmentStep << L'\n'
+                   << L"shortcut=" << settings.openingShortcut << L'\n'
+                   << L"resume=" << settings.resumeOnLaunch << L'\n'
+                   << L"separateDesktops=" << settings.separateDesktops << L'\n'
+                   << L"selected=" << settings.selectedDisplay << L'\n';
+            for (const auto& [device, value] : settings.monitors)
+                output << L"monitor:" << device << L'=' << value << L'\n';
+            for (const auto& [id, profile] : settings.desktops) {
+                output << L"desktop:" << id << L":brightness=" << profile.brightness << L'\n';
+                for (const auto& [device, value] : profile.monitors)
+                    output << L"desktop:" << id << L":monitor:" << device << L'=' << value << L'\n';
+            }
 }
 bool saveSettings(const Settings& settings) noexcept {
     try {
@@ -49,16 +82,7 @@ bool saveSettings(const Settings& settings) noexcept {
         temporary += L".tmp";
         {
             std::wofstream output(temporary, std::ios::trunc);
-            output << L"brightness=" << settings.brightness << L'\n'
-                   << L"warm=" << settings.warm << L'\n'
-                   << L"smooth=" << settings.smooth << L'\n'
-                   << L"theme=" << settings.theme << L'\n'
-                   << L"step=" << settings.adjustmentStep << L'\n'
-                   << L"shortcut=" << settings.openingShortcut << L'\n'
-                   << L"resume=" << settings.resumeOnLaunch << L'\n'
-                   << L"selected=" << settings.selectedDisplay << L'\n';
-            for (const auto& [device, value] : settings.monitors)
-                output << L"monitor:" << device << L'=' << value << L'\n';
+            writeSettings(output, settings);
             output.flush();
             if (!output) return false;
         }

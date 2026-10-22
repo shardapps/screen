@@ -70,5 +70,28 @@ int main() {
           "Overrides must isolate monitors");
     settings.setAll(80);
     check(settings.monitors.empty() && settings.forMonitor(L"DISPLAY-A") == 80, "All displays must clear overrides");
+    const std::wstring desktopA=L"{11111111-1111-1111-1111-111111111111}", desktopB=L"{22222222-2222-2222-2222-222222222222}";
+    check(validDesktopId(desktopA) && !validDesktopId(L"Desktop 1") && !validDesktopId(L"{00000000-0000-0000-0000-000000000000}"),
+          "Only real canonical desktop identifiers can create profiles");
+    settings.monitors[L"DISPLAY-A"]=65; settings.separateDesktops=true; settings.activeDesktop=desktopA;
+    check(settings.currentBrightness()==80 && settings.forMonitor(L"DISPLAY-A")==65,"New desktops inherit the shared baseline");
+    settings.setAll(20);
+    check(settings.brightness==80 && settings.monitors.at(L"DISPLAY-A")==65 && settings.forMonitor(L"DISPLAY-A")==20,
+          "Changing one desktop must not overwrite shared monitor settings");
+    settings.activeDesktop=desktopB;
+    check(settings.currentBrightness()==80 && settings.forMonitor(L"DISPLAY-A")==65,"First visit must not inherit the previous desktop's dimming");
+    settings.setMonitor(L"DISPLAY-A",40);
+    settings.activeDesktop=desktopA;
+    check(settings.currentBrightness()==20 && settings.forMonitor(L"DISPLAY-A")==20,"Switching back restores the original desktop's levels");
+    settings.setDesktopBrightness(desktopB,95);
+    check(settings.currentBrightness()==20 && settings.desktopBrightness(desktopB)==95,"Editing an inactive profile must not change the active desktop");
+    const auto render=settings.renderingSnapshot();
+    check(render.desktops.empty() && render.forMonitor(L"DISPLAY-A")==20 && render.activeDesktop==desktopA,
+          "Rendering snapshots resolve active levels without copying all desktop profiles");
+    settings.separateDesktops=false;
+    check(settings.currentBrightness()==80 && settings.forMonitor(L"DISPLAY-A")==65,"Disabling desktop profiles restores the shared baseline");
+    settings.separateDesktops=true; settings.desktops.erase(desktopA);
+    check(settings.currentBrightness()==80,"Resetting a profile restores shared brightness without deleting other desktops");
+    check(!settings.setDesktopBrightness(L"invalid",8),"Malformed desktop IDs must not create persistent entries");
     return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

@@ -28,6 +28,7 @@ Screen by **Shardapps** dims Windows desktop output using a full-desktop color t
 | --- | --- |
 | Native and small | C++20, Win32, and the Windows compositor. No bundled browser or managed runtime. |
 | Multi-monitor dimming | Adjust all displays together or select one display. Monitor geometry refreshes when Windows reports a display change. |
+| Windows desktop profiles | Opt in under Settings → Desktops. Detect named Task View desktops, save a brightness for each, and keep separate monitor levels inside each profile. |
 | Compact flyout | A 330 × 136 panel above the bottom-right taskbar. Open with Alt+S, adjust the slider, then click outside or press Escape. |
 | Smooth transitions | Velocity-preserving fades keep moving through rapid slider updates. Short panel transitions respect Windows' animation preference. |
 | Six palettes + System | Pearl, Midnight, Graphite, Ocean, Forest and Sunset, shared by the flyout and settings. Windows high contrast takes priority. |

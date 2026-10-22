@@ -1,6 +1,7 @@
 #pragma once
 #include "core.hpp"
 #include "desktop.hpp"
+#include "virtual_desktops.hpp"
 #include <windows.h>
 #include <atomic>
 #include <chrono>
@@ -34,13 +35,15 @@ private:
     std::thread thread_;
     std::mutex mutex_;
     std::atomic<bool> pending_{false};
-    Settings desired_, active_;
+    Settings desired_, active_, saved_;
     bool persist_ = false, rebuild_ = false, immediate_ = false;
     bool sessionLocked_ = false, motionAllowed_ = true;
     bool fading_ = false, coveragePending_ = false, auditing_ = false;
     bool overlayOnly_ = false, desktopMode_ = false, desktopBlocked_ = false;
     int reportedMode_ = -1;
     DesktopDimmer desktop_;
+    IVirtualDesktopManager* virtualManager_{};
+    bool virtualApartment_ = false;
     SmoothValue desktopAlpha_;
     HWINEVENTHOOK foregroundHook_{}, windowHook_{}, desktopHook_{}, locationHook_{};
     static thread_local OverlayEngine* observer_;

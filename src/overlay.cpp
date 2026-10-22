@@ -78,6 +78,8 @@ OverlayEngine::OverlayEngine(HWND owner, bool overlayOnly) : owner_(owner), over
         desktop_.reset();
         observer_ = nullptr;
         WTSUnRegisterSessionNotification(window);
+        if(virtualManager_) { virtualManager_->Release(); virtualManager_=nullptr; }
+        if(virtualApartment_) CoUninitialize();
     });
     (void)future.get(); // Synchronizes the worker's initialization of control_.
 }
@@ -89,7 +91,8 @@ void OverlayEngine::submit(const Settings& settings, bool persist, bool rebuildR
     if (!control_) return;
     {
         const std::lock_guard lock(mutex_);
-        desired_ = settings;
+        desired_ = settings.renderingSnapshot();
+        if(persist) saved_ = settings;
         immediate_ = immediate;
         persist_ = persist_ || persist;
         rebuild_ = rebuild_ || rebuildRequested;
@@ -134,18 +137,28 @@ void OverlayEngine::rebuild() {
 }
 void OverlayEngine::consume() {
     bool persist, refresh, immediate;
+    Settings saved;
     const bool previousWarm = active_.warm;
+    const auto previousDesktop = active_.activeDesktop;
     {
         const std::lock_guard lock(mutex_);
         active_ = desired_;
         desktopBlocked_ = false; // Retry the desktop API on a new user adjustment.
         persist = persist_;
+        if(persist) saved = std::move(saved_);
         refresh = rebuild_;
         immediate = immediate_;
         persist_ = rebuild_ = false;
         pending_ = false;
     }
     if (refresh || surfaces_.empty()) rebuild();
+    if (previousDesktop != active_.activeDesktop && !previousDesktop.empty() && !active_.activeDesktop.empty()) {
+        if(!virtualManager_) {
+            if(!virtualApartment_) virtualApartment_=SUCCEEDED(CoInitializeEx(nullptr,COINIT_APARTMENTTHREADED));
+            CoCreateInstance(CLSID_VirtualDesktopManager,nullptr,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(&virtualManager_));
+        }
+        for(const auto& surface:surfaces_) moveToDesktop(surface.window,active_.activeDesktop,virtualManager_);
+    }
     if (previousWarm != active_.warm) {
         for (const auto& surface : surfaces_) {
             SetWindowLongPtrW(surface.window, GWLP_USERDATA, active_.warm ? 1 : 0);
@@ -156,7 +169,7 @@ void OverlayEngine::consume() {
     if (immediate) active_.smooth = false;
     transition();
     active_.smooth = smooth; // Emergency restore must not overwrite the saved animation preference.
-    if (persist && !saveSettings(active_)) PostMessageW(owner_, settingsFailure, 0, 0);
+    if (persist && !saveSettings(saved)) PostMessageW(owner_, settingsFailure, 0, 0);
 }
 void OverlayEngine::transition() {
     BOOL allowed = TRUE;
@@ -239,6 +252,7 @@ void OverlayEngine::tick() {
 void CALLBACK OverlayEngine::windowEvent(HWINEVENTHOOK, DWORD event, HWND window, LONG object, LONG child, DWORD, DWORD) {
     auto* self = observer_;
     if (!self) return;
+    if(event == EVENT_SYSTEM_FOREGROUND && !self->active_.activeDesktop.empty()) PostMessageW(self->owner_,virtualDesktopsChanged,0,0);
     if (event == EVENT_OBJECT_LOCATIONCHANGE &&
         (!window || (GetWindowLongPtrW(window, GWL_EXSTYLE) & WS_EX_TOPMOST) == 0)) return;
     // Retry a previously unreachable Windows band only after a genuine change

@@ -3,6 +3,7 @@
 #include <cmath>
 #include <map>
 #include <string>
+#include <string_view>
 
 namespace screen {
 inline constexpr int minBrightness = 8;
@@ -46,6 +47,19 @@ struct SmoothValue {
     }
     void snap() noexcept { value = target; velocity = 0; }
 };
+inline constexpr size_t maxDesktopProfiles = 64;
+inline bool validDesktopId(std::wstring_view id) noexcept {
+    if (id.size() != 38 || id.front() != L'{' || id.back() != L'}') return false;
+    for (size_t i = 1; i < 37; ++i) {
+        if (i == 9 || i == 14 || i == 19 || i == 24) { if (id[i] != L'-') return false; }
+        else if (!((id[i] >= L'0' && id[i] <= L'9') || (id[i] >= L'A' && id[i] <= L'F'))) return false;
+    }
+    return id != L"{00000000-0000-0000-0000-000000000000}";
+}
+struct BrightnessProfile {
+    int brightness = 70;
+    std::map<std::wstring, int> monitors;
+};
 struct Settings {
     int brightness = 70;
     bool paused = true; // First launch is transparent until the user opts in.
@@ -55,15 +69,51 @@ struct Settings {
     int adjustmentStep = 5;
     int openingShortcut = 0; // Alt+S, Ctrl+Alt+S, Ctrl+Shift+S.
     bool resumeOnLaunch = false;
+    bool separateDesktops = false;
+    std::wstring activeDesktop; // Runtime context; the shared baseline is never replaced on a switch.
+    std::map<std::wstring, BrightnessProfile> desktops;
     std::wstring selectedDisplay;
     std::map<std::wstring, int> monitors;
+    const BrightnessProfile* currentProfile() const {
+        const auto it = desktops.find(activeDesktop);
+        return separateDesktops && it != desktops.end() ? &it->second : nullptr;
+    }
+    int currentBrightness() const { const auto* p = currentProfile(); return clampBrightness(p ? p->brightness : brightness); }
+    int desktopBrightness(const std::wstring& id) const {
+        const auto it = desktops.find(id);
+        return clampBrightness(it == desktops.end() ? brightness : it->second.brightness);
+    }
+    BrightnessProfile* profile(const std::wstring& id) {
+        if (!validDesktopId(id)) return nullptr;
+        const auto it = desktops.find(id);
+        if (it != desktops.end()) return &it->second;
+        if (desktops.size() >= maxDesktopProfiles) return nullptr;
+        return &desktops.emplace(id, BrightnessProfile{brightness, monitors}).first->second;
+    }
     int forMonitor(const std::wstring& device) const {
-        const auto it = monitors.find(device);
-        return clampBrightness(it == monitors.end() ? brightness : it->second);
+        const auto* p = currentProfile(); const auto& levels = p ? p->monitors : monitors;
+        const auto it = levels.find(device);
+        return clampBrightness(it == levels.end() ? currentBrightness() : it->second);
+    }
+    void setMonitor(const std::wstring& device, int value) {
+        if (separateDesktops && validDesktopId(activeDesktop)) {
+            if (auto* p = profile(activeDesktop)) p->monitors[device] = clampBrightness(value);
+        } else monitors[device] = clampBrightness(value);
+    }
+    bool setDesktopBrightness(const std::wstring& id, int value) {
+        auto* p = profile(id); if (!p) return false;
+        p->brightness = clampBrightness(value); p->monitors.clear(); return true;
     }
     void setAll(int value) {
-        brightness = clampBrightness(value);
-        monitors.clear();
+        if (separateDesktops && validDesktopId(activeDesktop)) setDesktopBrightness(activeDesktop, value);
+        else { brightness = clampBrightness(value); monitors.clear(); }
+    }
+    Settings renderingSnapshot() const {
+        Settings result;
+        result.brightness=currentBrightness(); result.paused=paused;
+        result.warm=warm; result.smooth=smooth; result.activeDesktop=activeDesktop;
+        const auto* p=currentProfile(); result.monitors=p?p->monitors:monitors;
+        return result; // No profile-map copies on high-frequency slider input.
     }
 };
 }
