@@ -1,5 +1,13 @@
 # Performance measurements
 
+## Regression comparison for the next release
+
+The x64 Windows CI job builds the pinned Store alpha source (`0a4ecf9`) and the current source with the same toolchain on the same host. `scripts/performance-test.ps1` interleaves five samples each of baseline shared-brightness tray mode, current shared mode, and current mode with three saved desktop profiles. Each process is forced paused; the script preserves the exact preference file and shuts down only its own copy.
+
+The artifact `Screen-performance-comparison` contains raw samples, median/range private commit, working set, CPU deltas, executable sizes and OS context. CI investigates a shared-tray private-memory regression above 20%, a binary above 1 MiB or a material paused CPU increase. Profile-mode costs are reported separately rather than silently compared with a simpler baseline. These are paused-process measurements, not compositor/GPU memory, an animation smoothness benchmark or proof of real Task View switching.
+
+Frame timers are created lazily and armed only during brightness or flyout motion. One-shot scheduling follows the reported desktop composition rate, capped at 144 Hz, without changing the global timer resolution. A native window timer remains the fallback. The portable smoothing model retains velocity through rapid retargets; all frame timers stop when settled or motion is disabled.
+
 ## v0.4.0 native settings sample
 
 Measured October 19, 2026 with the same Release x64 compiler/OS/display setup as below. Each row starts a separate process, settles for two seconds after the requested state, and measures process CPU over ten seconds. Settings and startup registrations were restored after tests.

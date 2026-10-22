@@ -70,7 +70,11 @@ OverlayEngine::OverlayEngine(HWND owner, bool overlayOnly) : owner_(owner), over
         locationHook_ = SetWinEventHook(EVENT_OBJECT_LOCATIONCHANGE, EVENT_OBJECT_LOCATIONCHANGE,
             nullptr, windowEvent, 0, 0, flags);
         MSG message{};
-        while (GetMessageW(&message, nullptr, 0, 0) > 0) {
+        for(;;) {
+            const auto event=frame_.wait(message);
+            if(event==FrameTimer::Event::frame) { tick();continue; }
+            if(event==FrameTimer::Event::quit) break;
+            if(event==FrameTimer::Event::error) { reportFailure();break; }
             TranslateMessage(&message);
             DispatchMessageW(&message);
         }
@@ -78,8 +82,6 @@ OverlayEngine::OverlayEngine(HWND owner, bool overlayOnly) : owner_(owner), over
         desktop_.reset();
         observer_ = nullptr;
         WTSUnRegisterSessionNotification(window);
-        if(virtualManager_) { virtualManager_->Release(); virtualManager_=nullptr; }
-        if(virtualApartment_) CoUninitialize();
     });
     (void)future.get(); // Synchronizes the worker's initialization of control_.
 }
@@ -109,6 +111,7 @@ void OverlayEngine::reportFailure() {
     }
     // Display broadcasts must not revive the last active opacity after an error.
     KillTimer(control_, 1);
+    frame_.cancel();
     KillTimer(control_, 3); auditing_ = false;
     fading_ = false;
     for (const auto& surface : surfaces_) DestroyWindow(surface.window);
@@ -139,7 +142,6 @@ void OverlayEngine::consume() {
     bool persist, refresh, immediate;
     Settings saved;
     const bool previousWarm = active_.warm;
-    const auto previousDesktop = active_.activeDesktop;
     {
         const std::lock_guard lock(mutex_);
         active_ = desired_;
@@ -152,13 +154,8 @@ void OverlayEngine::consume() {
         pending_ = false;
     }
     if (refresh || surfaces_.empty()) rebuild();
-    if (previousDesktop != active_.activeDesktop && !previousDesktop.empty() && !active_.activeDesktop.empty()) {
-        if(!virtualManager_) {
-            if(!virtualApartment_) virtualApartment_=SUCCEEDED(CoInitializeEx(nullptr,COINIT_APARTMENTTHREADED));
-            CoCreateInstance(CLSID_VirtualDesktopManager,nullptr,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(&virtualManager_));
-        }
-        for(const auto& surface:surfaces_) moveToDesktop(surface.window,active_.activeDesktop,virtualManager_);
-    }
+    // Unowned tool windows without WS_EX_APPWINDOW stay outside virtual-desktop
+    // cloaking. Overlays need no shell COM object or per-desktop window clones.
     if (previousWarm != active_.warm) {
         for (const auto& surface : surfaces_) {
             SetWindowLongPtrW(surface.window, GWLP_USERDATA, active_.warm ? 1 : 0);
@@ -191,7 +188,7 @@ void OverlayEngine::transition() {
             SetLayeredWindowAttributes(surface.window, 0, 0, LWA_ALPHA);
             ShowWindow(surface.window, SW_HIDE);
         }
-        KillTimer(control_, 1); fading_ = false;
+        KillTimer(control_, 1); frame_.cancel(); fading_ = false;
         desktopMode_ = useDesktop;
     }
     const int mode = desktopMode_ ? 1 : 0;
@@ -224,7 +221,7 @@ void OverlayEngine::tick() {
         else desktopAlpha_.snap();
         if (!desktop_.apply(static_cast<BYTE>(std::lround(desktopAlpha_.value)), active_.warm)) {
             desktopBlocked_ = true;
-            KillTimer(control_, 1); fading_ = false;
+            KillTimer(control_, 1); frame_.cancel(); fading_ = false;
             PostMessageW(control_, fallbackMessage, 0, 0);
             return;
         }
@@ -241,11 +238,16 @@ void OverlayEngine::tick() {
         }
         if (surface.alpha.value == 0 && surface.alpha.target == 0) ShowWindow(surface.window, SW_HIDE);
     }
-    if (animating && !fading_) {
-        if (!SetTimer(control_, 1, 15, nullptr)) reportFailure();
-        else fading_ = true;
+    if (animating) {
+        if(!fading_) frame_.begin();
+        if(frame_.arm()) { KillTimer(control_,1);fading_=true; }
+        else {
+            if(!SetTimer(control_,1,15,nullptr)) reportFailure();
+            else fading_=true;
+        }
     } else if (!animating) {
         KillTimer(control_, 1);
+        frame_.cancel();
         fading_ = false;
     }
 }
@@ -362,6 +364,7 @@ LRESULT CALLBACK OverlayEngine::procedure(HWND window, UINT message, WPARAM wPar
                 ShowWindow(surface.window, SW_HIDE);
             }
             KillTimer(window, 1);
+            self->frame_.cancel();
             KillTimer(window, 3); self->auditing_ = false;
             self->fading_ = false;
         } else if (wParam == WTS_SESSION_UNLOCK) {
@@ -372,6 +375,7 @@ LRESULT CALLBACK OverlayEngine::procedure(HWND window, UINT message, WPARAM wPar
     case WM_CLOSE:
         self->desktop_.reset();
         KillTimer(window, 1);
+        self->frame_.cancel();
         KillTimer(window, 2);
         KillTimer(window, 3);
         for (const auto& surface : self->surfaces_) DestroyWindow(surface.window);

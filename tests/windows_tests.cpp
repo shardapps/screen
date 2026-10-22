@@ -1,7 +1,9 @@
 #include "settings.hpp"
 #include "virtual_desktops.hpp"
+#include "frame_timer.hpp"
 #include <sstream>
 #include <iostream>
+#include <string_view>
 
 namespace {
 int notifications=0;
@@ -14,7 +16,13 @@ void pump() {
     while(PeekMessageW(&message,nullptr,0,0,PM_REMOVE)) { TranslateMessage(&message); DispatchMessageW(&message); }
 }
 }
-int main() {
+int main(int argc,char** argv) {
+    if(argc==2 && std::string_view(argv[1])=="--inspect-desktops") {
+        screen::VirtualDesktops desktops(nullptr);
+        std::wcout<<L"Detected desktops: "<<desktops.items().size()<<L'\n';
+        for(const auto& item:desktops.items()) std::wcout<<(item.id==desktops.current()?L"* ":L"  ")<<item.name<<L'\n';
+        return desktops.current().empty()?2:0;
+    }
     int failures=0;
     const auto check=[&](bool ok,const char* text){if(!ok){std::cerr<<text<<'\n';++failures;}};
     using namespace screen;
@@ -76,5 +84,25 @@ int main() {
     GetProcessHandleCount(GetCurrentProcess(),&after);
     check(after<=before+2,"Repeated desktop observer creation must not leak registry or wait handles");
     DestroyWindow(window);RegCloseKey(root);RegDeleteTreeW(HKEY_CURRENT_USER,path.c_str());
+    pump();
+    {
+        FrameTimer frame;
+        check(!frame.handle(),"A fresh timer must allocate no idle wait handle");
+        PostThreadMessageW(GetCurrentThreadId(),WM_APP+100,0,0);
+        MSG message{};
+        check(frame.wait(message)==FrameTimer::Event::message && message.message==WM_APP+100,"The message pump must handle normal input with no animation timer");
+        frame.begin();
+        if(frame.arm()) {
+            const auto handle=frame.handle();
+            check(frame.arm() && frame.handle()==handle,"Retargeting keeps the same scheduled timer");
+            FrameTimer::Event event;
+            do { event=frame.wait(message);if(event==FrameTimer::Event::message) DispatchMessageW(&message); } while(event==FrameTimer::Event::message);
+            check(event==FrameTimer::Event::frame && !frame.handle(),"A frame wakes the existing thread once and disarms itself");
+            check(frame.arm(),"The next frame can be scheduled");frame.cancel();
+            check(!frame.handle(),"Settled or reduced-motion transitions leave no armed timer");
+        } else std::cout<<"SKIP: high-resolution timer unavailable; app uses native window-timer fallback\n";
+        PostQuitMessage(0);
+        check(frame.wait(message)==FrameTimer::Event::quit,"A quit condition must be drained before another input wait");
+    }
     return failures?1:0;
 }

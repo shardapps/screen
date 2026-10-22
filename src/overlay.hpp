@@ -2,6 +2,7 @@
 #include "core.hpp"
 #include "desktop.hpp"
 #include "virtual_desktops.hpp"
+#include "frame_timer.hpp"
 #include <windows.h>
 #include <atomic>
 #include <chrono>
@@ -42,14 +43,13 @@ private:
     bool overlayOnly_ = false, desktopMode_ = false, desktopBlocked_ = false;
     int reportedMode_ = -1;
     DesktopDimmer desktop_;
-    IVirtualDesktopManager* virtualManager_{};
-    bool virtualApartment_ = false;
     SmoothValue desktopAlpha_;
     HWINEVENTHOOK foregroundHook_{}, windowHook_{}, desktopHook_{}, locationHook_{};
     static thread_local OverlayEngine* observer_;
     std::vector<Surface> surfaces_;
     std::vector<HWND> higherBandWindows_;
     std::chrono::steady_clock::time_point start_;
+    FrameTimer frame_;
     static LRESULT CALLBACK procedure(HWND, UINT, WPARAM, LPARAM);
     static void CALLBACK windowEvent(HWINEVENTHOOK, DWORD, HWND, LONG, LONG, DWORD, DWORD);
     void queueCoverage();
