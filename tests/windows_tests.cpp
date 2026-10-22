@@ -1,5 +1,6 @@
 #include "settings.hpp"
 #include "virtual_desktops.hpp"
+#include "frame_timer.hpp"
 #include <sstream>
 #include <iostream>
 
@@ -76,5 +77,23 @@ int main() {
     GetProcessHandleCount(GetCurrentProcess(),&after);
     check(after<=before+2,"Repeated desktop observer creation must not leak registry or wait handles");
     DestroyWindow(window);RegCloseKey(root);RegDeleteTreeW(HKEY_CURRENT_USER,path.c_str());
+    pump();
+    {
+        FrameTimer frame;
+        check(!frame.handle(),"A fresh timer must allocate no idle wait handle");
+        PostThreadMessageW(GetCurrentThreadId(),WM_APP+100,0,0);
+        MSG message{};
+        check(frame.wait(message)==FrameTimer::Event::message && message.message==WM_APP+100,"The message pump must handle normal input with no animation timer");
+        frame.begin();
+        if(frame.arm()) {
+            const auto handle=frame.handle();
+            check(frame.arm() && frame.handle()==handle,"Retargeting keeps the same scheduled timer");
+            FrameTimer::Event event;
+            do { event=frame.wait(message);if(event==FrameTimer::Event::message) DispatchMessageW(&message); } while(event==FrameTimer::Event::message);
+            check(event==FrameTimer::Event::frame && !frame.handle(),"A frame wakes the existing thread once and disarms itself");
+            check(frame.arm(),"The next frame can be scheduled");frame.cancel();
+            check(!frame.handle(),"Settled or reduced-motion transitions leave no armed timer");
+        } else std::cout<<"SKIP: high-resolution timer unavailable; app uses native window-timer fallback\n";
+    }
     return failures?1:0;
 }

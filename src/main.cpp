@@ -29,6 +29,7 @@ struct App {
     double panelAlpha = 255, fromAlpha = 255, toAlpha = 255;
     RECT destination{};
     std::chrono::steady_clock::time_point animationStart;
+    screen::FrameTimer panelFrame;
     COLORREF bg{}, fg{}, muted{}, accent{}, track{}, border{};
     screen::ui::Palette colors{};
     std::wstring statusText, selected, shortcutText = L"Alt + S";
@@ -62,7 +63,7 @@ struct App {
         const bool changed = settings.activeDesktop != workspaces->current();
         settings.activeDesktop = workspaces->current();
         if (changed) {
-            KillTimer(window,10); animating=false; panelAlpha=0; ShowWindow(window,SW_HIDE);
+            KillTimer(window,10);panelFrame.cancel(); animating=false; panelAlpha=0; ShowWindow(window,SW_HIDE);
             workspaces->moveWindow(window);
             if (engine) apply(false);
         }
@@ -183,13 +184,16 @@ struct App {
         BOOL allowed = TRUE; SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, &allowed, 0);
         opening = show; fromAlpha = panelAlpha; toAlpha = show ? 255.0 : 0.0;
         if (!settings.smooth || !allowed) {
-            KillTimer(window, 10); animating = false; panelAlpha = toAlpha;
+            KillTimer(window, 10); panelFrame.cancel(); animating = false; panelAlpha = toAlpha;
             SetLayeredWindowAttributes(window, 0, static_cast<BYTE>(panelAlpha), LWA_ALPHA);
             if (!show) ShowWindow(window, SW_HIDE);
             return;
         }
         animationStart = std::chrono::steady_clock::now();
-        animating = SetTimer(window, 10, 15, nullptr) != 0;
+        panelFrame.begin();
+        animating = panelFrame.arm();
+        if(animating) KillTimer(window,10);
+        else animating = SetTimer(window,10,15,nullptr)!=0;
         if (!animating) { panelAlpha = toAlpha; SetLayeredWindowAttributes(window, 0, static_cast<BYTE>(panelAlpha), LWA_ALPHA); if (!show) ShowWindow(window, SW_HIDE); }
     }
     void animateTick() {
@@ -202,7 +206,13 @@ struct App {
         SetLayeredWindowAttributes(window, 0, static_cast<BYTE>(std::lround(panelAlpha)), LWA_ALPHA);
         if (seconds >= duration) {
             KillTimer(window, 10); animating = false;
+            panelFrame.cancel();
             if (!opening) ShowWindow(window, SW_HIDE);
+        } else if(!panelFrame.arm() && !SetTimer(window,10,15,nullptr)) {
+            animating=false;panelAlpha=toAlpha;panelFrame.cancel();
+            SetLayeredWindowAttributes(window,0,static_cast<BYTE>(panelAlpha),LWA_ALPHA);
+            SetWindowPos(window,nullptr,destination.left,destination.top,0,0,SWP_NOZORDER | SWP_NOSIZE | SWP_NOACTIVATE);
+            if(!opening) ShowWindow(window,SW_HIDE);
         }
     }
     void show() {
@@ -499,7 +509,7 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
     case WM_QUERYENDSESSION: return TRUE;
     case WM_ENDSESSION: if (wParam) DestroyWindow(window); return 0;
     case WM_DESTROY: {
-        KillTimer(window, 10); app->cancelTimedPause(); app->preferences.reset(); app->engine.reset(); app->workspaces.reset();
+        KillTimer(window, 10);app->panelFrame.cancel(); app->cancelTimedPause(); app->preferences.reset(); app->engine.reset(); app->workspaces.reset();
         NOTIFYICONDATAW data{sizeof(data)}; data.hWnd = window; data.uID = 1; Shell_NotifyIconW(NIM_DELETE, &data);
         for (int id = 1; id <= 5; ++id) UnregisterHotKey(window, id);
         PostQuitMessage(0); return 0;
@@ -550,8 +560,12 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
     if (!window) { CloseHandle(mutex); return 1; }
     if (openSettings) app.openPreferences();
     else if (!background || !app.trayPresent) app.show();
-    MSG message{}; int result;
-    while ((result = static_cast<int>(GetMessageW(&message, nullptr, 0, 0))) > 0) {
+    MSG message{}; int result=0;
+    for(;;) {
+        const auto event=app.panelFrame.wait(message);
+        if(event==screen::FrameTimer::Event::frame) { app.animateTick();continue; }
+        if(event==screen::FrameTimer::Event::quit) break;
+        if(event==screen::FrameTimer::Event::error) { result=-1;break; }
         if (app.preferences && app.preferences->message(message)) continue;
         if (!IsDialogMessageW(window, &message)) { TranslateMessage(&message); DispatchMessageW(&message); }
     }

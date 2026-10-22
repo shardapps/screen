@@ -5,6 +5,9 @@
 - Add opt-in brightness profiles for named Windows virtual desktops, with independent physical-monitor overrides and a shared fallback.
 - Add a Desktops settings page to edit detected profiles without switching the Windows desktop.
 - Keep desktop discovery event-driven and release its observer when it is no longer needed.
+- Fix the display picker's blank white first paint, refine all six palettes and clarify the two startup preferences.
+- Add short time-based theme/tab transitions and animation-only high-resolution pacing for brightness and the flyout.
+- Compare paused memory/CPU with the Store alpha in Windows CI; add no framework or permanent frame loop.
 
 ## 1.0.0 — Alpha 1
 

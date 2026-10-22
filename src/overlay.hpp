@@ -2,6 +2,7 @@
 #include "core.hpp"
 #include "desktop.hpp"
 #include "virtual_desktops.hpp"
+#include "frame_timer.hpp"
 #include <windows.h>
 #include <atomic>
 #include <chrono>
@@ -50,6 +51,7 @@ private:
     std::vector<Surface> surfaces_;
     std::vector<HWND> higherBandWindows_;
     std::chrono::steady_clock::time_point start_;
+    FrameTimer frame_;
     static LRESULT CALLBACK procedure(HWND, UINT, WPARAM, LPARAM);
     static void CALLBACK windowEvent(HWINEVENTHOOK, DWORD, HWND, LONG, LONG, DWORD, DWORD);
     void queueCoverage();

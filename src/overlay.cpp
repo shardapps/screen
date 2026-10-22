@@ -70,7 +70,11 @@ OverlayEngine::OverlayEngine(HWND owner, bool overlayOnly) : owner_(owner), over
         locationHook_ = SetWinEventHook(EVENT_OBJECT_LOCATIONCHANGE, EVENT_OBJECT_LOCATIONCHANGE,
             nullptr, windowEvent, 0, 0, flags);
         MSG message{};
-        while (GetMessageW(&message, nullptr, 0, 0) > 0) {
+        for(;;) {
+            const auto event=frame_.wait(message);
+            if(event==FrameTimer::Event::frame) { tick();continue; }
+            if(event==FrameTimer::Event::quit) break;
+            if(event==FrameTimer::Event::error) { reportFailure();break; }
             TranslateMessage(&message);
             DispatchMessageW(&message);
         }
@@ -109,6 +113,7 @@ void OverlayEngine::reportFailure() {
     }
     // Display broadcasts must not revive the last active opacity after an error.
     KillTimer(control_, 1);
+    frame_.cancel();
     KillTimer(control_, 3); auditing_ = false;
     fading_ = false;
     for (const auto& surface : surfaces_) DestroyWindow(surface.window);
@@ -191,7 +196,7 @@ void OverlayEngine::transition() {
             SetLayeredWindowAttributes(surface.window, 0, 0, LWA_ALPHA);
             ShowWindow(surface.window, SW_HIDE);
         }
-        KillTimer(control_, 1); fading_ = false;
+        KillTimer(control_, 1); frame_.cancel(); fading_ = false;
         desktopMode_ = useDesktop;
     }
     const int mode = desktopMode_ ? 1 : 0;
@@ -224,7 +229,7 @@ void OverlayEngine::tick() {
         else desktopAlpha_.snap();
         if (!desktop_.apply(static_cast<BYTE>(std::lround(desktopAlpha_.value)), active_.warm)) {
             desktopBlocked_ = true;
-            KillTimer(control_, 1); fading_ = false;
+            KillTimer(control_, 1); frame_.cancel(); fading_ = false;
             PostMessageW(control_, fallbackMessage, 0, 0);
             return;
         }
@@ -241,11 +246,16 @@ void OverlayEngine::tick() {
         }
         if (surface.alpha.value == 0 && surface.alpha.target == 0) ShowWindow(surface.window, SW_HIDE);
     }
-    if (animating && !fading_) {
-        if (!SetTimer(control_, 1, 15, nullptr)) reportFailure();
-        else fading_ = true;
+    if (animating) {
+        if(!fading_) frame_.begin();
+        if(frame_.arm()) { KillTimer(control_,1);fading_=true; }
+        else {
+            if(!SetTimer(control_,1,15,nullptr)) reportFailure();
+            else fading_=true;
+        }
     } else if (!animating) {
         KillTimer(control_, 1);
+        frame_.cancel();
         fading_ = false;
     }
 }
@@ -362,6 +372,7 @@ LRESULT CALLBACK OverlayEngine::procedure(HWND window, UINT message, WPARAM wPar
                 ShowWindow(surface.window, SW_HIDE);
             }
             KillTimer(window, 1);
+            self->frame_.cancel();
             KillTimer(window, 3); self->auditing_ = false;
             self->fading_ = false;
         } else if (wParam == WTS_SESSION_UNLOCK) {
@@ -372,6 +383,7 @@ LRESULT CALLBACK OverlayEngine::procedure(HWND window, UINT message, WPARAM wPar
     case WM_CLOSE:
         self->desktop_.reset();
         KillTimer(window, 1);
+        self->frame_.cancel();
         KillTimer(window, 2);
         KillTimer(window, 3);
         for (const auto& surface : self->surfaces_) DestroyWindow(surface.window);
