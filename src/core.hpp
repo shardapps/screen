@@ -108,5 +108,12 @@ struct Settings {
         if (separateDesktops && validDesktopId(activeDesktop)) setDesktopBrightness(activeDesktop, value);
         else { brightness = clampBrightness(value); monitors.clear(); }
     }
+    Settings renderingSnapshot() const {
+        Settings result;
+        result.brightness=currentBrightness(); result.paused=paused;
+        result.warm=warm; result.smooth=smooth; result.activeDesktop=activeDesktop;
+        const auto* p=currentProfile(); result.monitors=p?p->monitors:monitors;
+        return result; // No profile-map copies on high-frequency slider input.
+    }
 };
 }

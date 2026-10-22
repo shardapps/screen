@@ -85,6 +85,9 @@ int main() {
     check(settings.currentBrightness()==20 && settings.forMonitor(L"DISPLAY-A")==20,"Switching back restores the original desktop's levels");
     settings.setDesktopBrightness(desktopB,95);
     check(settings.currentBrightness()==20 && settings.desktopBrightness(desktopB)==95,"Editing an inactive profile must not change the active desktop");
+    const auto render=settings.renderingSnapshot();
+    check(render.desktops.empty() && render.forMonitor(L"DISPLAY-A")==20 && render.activeDesktop==desktopA,
+          "Rendering snapshots resolve active levels without copying all desktop profiles");
     settings.separateDesktops=false;
     check(settings.currentBrightness()==80 && settings.forMonitor(L"DISPLAY-A")==65,"Disabling desktop profiles restores the shared baseline");
     settings.separateDesktops=true; settings.desktops.erase(desktopA);

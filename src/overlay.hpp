@@ -35,7 +35,7 @@ private:
     std::thread thread_;
     std::mutex mutex_;
     std::atomic<bool> pending_{false};
-    Settings desired_, active_;
+    Settings desired_, active_, saved_;
     bool persist_ = false, rebuild_ = false, immediate_ = false;
     bool sessionLocked_ = false, motionAllowed_ = true;
     bool fading_ = false, coveragePending_ = false, auditing_ = false;

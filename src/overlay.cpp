@@ -91,7 +91,8 @@ void OverlayEngine::submit(const Settings& settings, bool persist, bool rebuildR
     if (!control_) return;
     {
         const std::lock_guard lock(mutex_);
-        desired_ = settings;
+        desired_ = settings.renderingSnapshot();
+        if(persist) saved_ = settings;
         immediate_ = immediate;
         persist_ = persist_ || persist;
         rebuild_ = rebuild_ || rebuildRequested;
@@ -136,6 +137,7 @@ void OverlayEngine::rebuild() {
 }
 void OverlayEngine::consume() {
     bool persist, refresh, immediate;
+    Settings saved;
     const bool previousWarm = active_.warm;
     const auto previousDesktop = active_.activeDesktop;
     {
@@ -143,6 +145,7 @@ void OverlayEngine::consume() {
         active_ = desired_;
         desktopBlocked_ = false; // Retry the desktop API on a new user adjustment.
         persist = persist_;
+        if(persist) saved = std::move(saved_);
         refresh = rebuild_;
         immediate = immediate_;
         persist_ = rebuild_ = false;
@@ -166,7 +169,7 @@ void OverlayEngine::consume() {
     if (immediate) active_.smooth = false;
     transition();
     active_.smooth = smooth; // Emergency restore must not overwrite the saved animation preference.
-    if (persist && !saveSettings(active_)) PostMessageW(owner_, settingsFailure, 0, 0);
+    if (persist && !saveSettings(saved)) PostMessageW(owner_, settingsFailure, 0, 0);
 }
 void OverlayEngine::transition() {
     BOOL allowed = TRUE;
