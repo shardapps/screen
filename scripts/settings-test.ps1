@@ -152,14 +152,34 @@ function Capture-Slider([string]$name){
  Send $preferences 0x0111 1015
  Wait-SettingsFile 'brightness=100'
 }
+function Assert-PickerFirstPaint {
+ $picker=[PreferencesTest]::GetDlgItem($preferences,1010)
+ [void][PreferencesTest]::ShowWindow($preferences,4)
+ [void][PreferencesTest]::RedrawWindow($preferences,[IntPtr]::Zero,[IntPtr]::Zero,0x0585)
+ [void][PreferencesTest]::DwmFlush()
+ $rect=[PreferencesTest+Rect]::new();[void][PreferencesTest]::GetWindowRect($picker,[ref]$rect)
+ $bitmap=[Drawing.Bitmap]::new($rect.Right-$rect.Left,$rect.Bottom-$rect.Top)
+ $graphics=[Drawing.Graphics]::FromImage($bitmap);$dc=$graphics.GetHdc()
+ try{if(-not [PreferencesTest]::PrintWindow($picker,$dc,2)){throw 'Could not capture picker first paint'}}finally{$graphics.ReleaseHdc($dc);$graphics.Dispose()}
+ try{
+  $face=$bitmap.GetPixel(8,[int]($bitmap.Height/2))
+  if($face.R -gt 100 -or $face.G -gt 100 -or $face.B -gt 100){throw 'Dark display picker painted a light/white face before hover'}
+  $glyphs=0
+  for($y=4;$y -lt $bitmap.Height-4;$y++){for($x=12;$x -lt [Math]::Min(180,$bitmap.Width-35);$x++){
+   $pixel=$bitmap.GetPixel($x,$y);if($pixel.R -gt 150 -and $pixel.G -gt 150 -and $pixel.B -gt 150){$glyphs++}
+  }}
+  if($glyphs -lt 10){throw 'Selected display text is missing before hover'}
+ }finally{$bitmap.Dispose()}
+}
 try{
  [void][PreferencesTest]::SetThreadDpiAwarenessContext([IntPtr](-4))
  [void][IO.Directory]::CreateDirectory((Split-Path -Parent $settingsFile))
- [IO.File]::WriteAllText($settingsFile,"brightness=70`nwarm=0`nsmooth=1`nresume=0`n")
+ [IO.File]::WriteAllText($settingsFile,"brightness=70`nwarm=0`nsmooth=1`nresume=0`ntheme=2`n")
  $key=[Microsoft.Win32.Registry]::CurrentUser.CreateSubKey($runPath);$key.DeleteValue($runName,$false);$key.Dispose()
  Start-Screen;Isolate-Overlays;Open-Settings
  $display=[PreferencesTest]::GetDlgItem($preferences,1010)
  if([PreferencesTest]::SendMessage($display,0x0146,[IntPtr]::Zero,[IntPtr]::Zero).ToInt64() -lt 2){throw 'Display picker did not enumerate screens'}
+ Assert-PickerFirstPaint
  Capture 'settings-displays.png'
  Send $display 0x014E 1;Send $preferences 0x0111 (1010 -bor (1 -shl 16)) $display
  Start-Sleep -Milliseconds 100

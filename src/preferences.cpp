@@ -57,6 +57,8 @@ HWND PreferencesWindow::add(const wchar_t* type, const wchar_t* value, DWORD sty
     int pageIndex, int x, int y, int width, int height) {
     const auto child = CreateWindowExW(0, type, value, WS_CHILD | WS_VISIBLE | style,
         0,0,0,0,window_,reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),GetModuleHandleW(nullptr),nullptr);
+    if(lstrcmpiW(type,WC_COMBOBOXW)==0) SetWindowSubclass(child,ui::comboProcedure,1,0);
+    if(lstrcmpiW(type,L"BUTTON")==0) SetWindowSubclass(child,ui::buttonProcedure,1,0);
     items_.push_back({child,pageIndex,x,y,width,height}); return child;
 }
 void PreferencesWindow::createControls() {
@@ -91,7 +93,7 @@ void PreferencesWindow::createControls() {
         24+((i-1)%2)*244,312+((i-1)/2)*96,228,82);
 
     add(L"BUTTON",L"Start with Windows",BS_AUTOCHECKBOX | WS_TABSTOP,startupId,2,24,160,472,38);
-    add(L"BUTTON",L"Resume saved dimming when Screen opens",BS_AUTOCHECKBOX | WS_TABSTOP,resumeId,2,24,214,472,38);
+    add(L"BUTTON",L"Apply saved brightness when Screen opens",BS_AUTOCHECKBOX | WS_TABSTOP,resumeId,2,24,214,472,38);
     add(L"BUTTON",L"Smooth transitions",BS_AUTOCHECKBOX | WS_TABSTOP,smoothId,2,24,268,472,38);
     add(L"BUTTON",L"Warm tint",BS_AUTOCHECKBOX | WS_TABSTOP,warmId,2,24,322,472,38);
     label(L"Adjustment step",2,24,386,228,24);
@@ -137,15 +139,27 @@ void PreferencesWindow::fonts() {
 }
 void PreferencesWindow::theme() {
     const auto next = ui::palette(settings_.theme);
-    if (background_ && next == colors_ && appliedTheme_ == settings_.theme) return;
-    colors_ = next; appliedTheme_ = settings_.theme;
-    if (background_) DeleteObject(background_);
-    background_ = CreateSolidBrush(colors_.bg); ui::windowTheme(window_,colors_);
+    BOOL allowed=TRUE;SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION,0,&allowed,0);
+    const bool motion=settings_.smooth && allowed && !next.highContrast && !colors_.highContrast;
+    if(background_ && next==themeTarget_ && appliedTheme_==settings_.theme && (!themeAnimating_ || motion)) return;
+    appliedTheme_=settings_.theme;themeTarget_=next;
+    if(background_ && IsWindowVisible(window_) && motion) {
+        themeFrom_=colors_;themeStart_=std::chrono::steady_clock::now();
+        themeAnimating_=SetTimer(window_,3,15,nullptr)!=0;
+        if(!themeAnimating_) applyColors(next);
+    } else { KillTimer(window_,3);themeAnimating_=false;applyColors(next); }
+    ui::windowTheme(window_,next);
     for (int i=0;i<7;++i) {
         auto name = std::wstring(ui::themeNames[static_cast<size_t>(i)]);
         if (i == settings_.theme) name += L" (selected)";
         setText(GetDlgItem(window_,themeBase+i),name);
     }
+    RedrawWindow(window_,nullptr,nullptr,RDW_INVALIDATE | RDW_ALLCHILDREN);
+}
+void PreferencesWindow::applyColors(const ui::Palette& colors) {
+    colors_=colors;
+    if(background_)DeleteObject(background_);
+    background_=CreateSolidBrush(colors_.bg);
     RedrawWindow(window_,nullptr,nullptr,RDW_INVALIDATE | RDW_ALLCHILDREN);
 }
 void PreferencesWindow::layout() {
@@ -170,6 +184,7 @@ void PreferencesWindow::page(int index) {
     page_=std::clamp(index,0,3); scroll_=0;
     BOOL allowed=TRUE; SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION,0,&allowed,0);
     animationAlpha_=settings_.smooth && allowed ? 0 : 255;
+    pageStart_=std::chrono::steady_clock::now();
     layout();
     if (settings_.smooth && allowed && IsWindowVisible(window_)) {
         if (!SetTimer(window_,1,15,nullptr)) animationAlpha_=255;
@@ -212,7 +227,10 @@ void PreferencesWindow::refresh(bool rebuildDisplays) {
     else if(startup_==StartupState::userDisabled) startupText=L"Disabled in Windows. Re-enable Screen in Windows startup settings.";
     else if(startup_==StartupState::blocked) startupText=L"Startup is managed by your Windows policy.";
     else if(startup_==StartupState::error) startupText=L"Startup could not be updated. Try again or use Windows startup settings.";
-    else startupText=L"Launches quietly in the tray. Starts paused unless saved dimming is set to resume. Windows startup settings can override registration.";
+    else if(startup_==StartupState::on && settings_.resumeOnLaunch) startupText=L"Starts quietly in the tray and applies saved brightness at sign-in. Windows startup settings take priority.";
+    else if(startup_==StartupState::on) startupText=L"Starts quietly in the tray, paused. Enable Apply saved brightness above to restore brightness at sign-in.";
+    else if(settings_.resumeOnLaunch) startupText=L"Saved brightness applies when you open Screen. Enable Start with Windows above to run at sign-in.";
+    else startupText=L"Startup and saved brightness are separate opt-ins. Enable both above to restore brightness automatically at sign-in.";
     setText(GetDlgItem(window_,startupStatusId),startupText);
     refreshDesktops(rebuildDisplays);
     refreshing_=false;
@@ -337,16 +355,20 @@ void PreferencesWindow::drawButton(const DRAWITEMSTRUCT& draw) {
     } else {
         const bool nav=id>=navBase && id<navBase+4;
         const bool active=nav && id-navBase==page_;
-        auto fill=colors_.border;
-        if(draw.itemState & ODS_SELECTED) fill=colors_.track;
-        else if(active) fill=RGB(
-            GetRValue(colors_.border)+MulDiv(GetRValue(colors_.track)-GetRValue(colors_.border),animationAlpha_,255),
-            GetGValue(colors_.border)+MulDiv(GetGValue(colors_.track)-GetGValue(colors_.border),animationAlpha_,255),
-            GetBValue(colors_.border)+MulDiv(GetBValue(colors_.track)-GetBValue(colors_.border),animationAlpha_,255));
-        ui::roundFill(dc,rect,px(10),fill);
+        POINT pointer{};GetCursorPos(&pointer);const bool hot=WindowFromPoint(pointer)==draw.hwndItem;
+        const bool pressed=(draw.itemState & ODS_SELECTED)!=0,enabled=IsWindowEnabled(draw.hwndItem)!=FALSE;
+        auto fill=ui::blend(colors_.bg,colors_.fg,colors_.dark?0.045:0.035);
+        if(nav) fill=colors_.bg;
+        if(hot && enabled) fill=ui::blend(colors_.bg,colors_.fg,0.08);
+        if(active) fill=ui::blend(colors_.bg,colors_.accent,0.04+0.11*animationAlpha_/255.0);
+        if(pressed) fill=ui::blend(colors_.bg,colors_.accent,0.20);
+        if(!nav) {ui::roundFill(dc,rect,px(12),colors_.border);InflateRect(&rect,-px(1),-px(1));}
+        ui::roundFill(dc,rect,px(10),colors_.highContrast?colors_.bg:fill);
         auto label=std::wstring(static_cast<size_t>(GetWindowTextLengthW(draw.hwndItem))+1,L'\0');
         GetWindowTextW(draw.hwndItem,label.data(),static_cast<int>(label.size())); label.resize(wcslen(label.c_str()));
-        ui::text(dc,rect,label,active?colors_.accent:colors_.fg,DT_CENTER|DT_VCENTER|DT_SINGLELINE);
+        ui::text(dc,rect,label,!enabled?colors_.muted:active?colors_.accent:colors_.fg,DT_CENTER|DT_VCENTER|DT_SINGLELINE);
+        if(active) {const auto center=(rect.left+rect.right)/2;const auto half=px(12)*animationAlpha_/255;
+            ui::roundFill(dc,{center-half,rect.bottom-px(4),center+half,rect.bottom-px(2)},px(2),colors_.accent);}
     }
     if((draw.itemState & ODS_FOCUS) && !(draw.itemState & ODS_NOFOCUSRECT)) {
         auto focus=draw.rcItem; InflateRect(&focus,-px(4),-px(4)); DrawFocusRect(dc,&focus);
@@ -378,9 +400,10 @@ LRESULT PreferencesWindow::customDraw(NMCUSTOMDRAW& draw) {
 void PreferencesWindow::paint(HDC dc) {
     RECT rect{}; GetClientRect(window_,&rect); FillRect(dc,&rect,background_);
     const auto previous=SelectObject(dc,titleFont_);
-    ui::text(dc,{px(24),px(20-scroll_),rect.right-px(24),px(56-scroll_)},L"Screen Dimmer settings",colors_.fg);
+    ui::text(dc,{px(24),px(20-scroll_),rect.right-px(24),px(56-scroll_)},L"Screen Dimmer",colors_.fg);
     SelectObject(dc,smallFont_);
-    ui::text(dc,{px(24),px(60-scroll_),rect.right-px(24),px(82-scroll_)},L"Your screens. Your comfort. Everything stays local.",colors_.muted);
+    ui::text(dc,{px(24),px(60-scroll_),rect.right-px(24),px(82-scroll_)},L"A softer workspace, on your terms.",colors_.muted);
+    ui::roundFill(dc,{px(24),px(143-scroll_),rect.right-px(24),px(144-scroll_)},0,colors_.border);
     SelectObject(dc,previous);
 }
 LRESULT CALLBACK PreferencesWindow::procedure(HWND window,UINT message,WPARAM wParam,LPARAM lParam) {
@@ -422,6 +445,7 @@ LRESULT CALLBACK PreferencesWindow::procedure(HWND window,UINT message,WPARAM wP
         if(reinterpret_cast<NMHDR*>(lParam)->code==NM_CUSTOMDRAW) return self->customDraw(*reinterpret_cast<NMCUSTOMDRAW*>(lParam));
         break;
     case ui::printSlider: ui::drawSlider(reinterpret_cast<HWND>(lParam),reinterpret_cast<HDC>(wParam),self->colors_,self->dpi_); return 0;
+    case ui::printCombo: ui::drawCombo(reinterpret_cast<HWND>(lParam),reinterpret_cast<HDC>(wParam),self->colors_,self->dpi_); return 0;
     case WM_DRAWITEM: self->drawButton(*reinterpret_cast<DRAWITEMSTRUCT*>(lParam)); return TRUE;
     case WM_MEASUREITEM: reinterpret_cast<MEASUREITEMSTRUCT*>(lParam)->itemHeight=static_cast<UINT>(self->px(28)); return TRUE;
     case WM_CTLCOLORSTATIC: case WM_CTLCOLOREDIT: case WM_CTLCOLORLISTBOX: case WM_CTLCOLORBTN:
@@ -434,16 +458,23 @@ LRESULT CALLBACK PreferencesWindow::procedure(HWND window,UINT message,WPARAM wP
     }
     case WM_TIMER:
         if(wParam==1) {
-            self->animationAlpha_=std::min(255,self->animationAlpha_+36);
+            const auto elapsed=std::chrono::duration<double>(std::chrono::steady_clock::now()-self->pageStart_).count();
+            self->animationAlpha_=self->settings_.smooth?static_cast<int>(255*ease(elapsed*transitionSeconds/0.16)):255;
             InvalidateRect(GetDlgItem(window,navBase+self->page_),nullptr,FALSE);
             if(self->animationAlpha_==255) KillTimer(window,1);
         } else if(wParam==2) self->clearIdentifiers();
+        else if(wParam==3) {
+            const auto elapsed=std::chrono::duration<double>(std::chrono::steady_clock::now()-self->themeStart_).count();
+            const auto amount=self->settings_.smooth?ease(elapsed*transitionSeconds/0.18):1.0;
+            self->applyColors(ui::blend(self->themeFrom_,self->themeTarget_,amount));
+            if(amount>=1) {KillTimer(window,3);self->themeAnimating_=false;}
+        }
         return 0;
     case WM_SETTINGCHANGE: case WM_THEMECHANGED: self->theme(); return 0;
     case WM_CLOSE: self->close(); return 0;
     case WM_DESTROY:
         PostMessageW(self->owner_,preferencesClosed,0,0);
-        KillTimer(window,1); self->clearIdentifiers();
+        KillTimer(window,1);KillTimer(window,3);self->themeAnimating_=false; self->clearIdentifiers();
         for(auto font:{self->font_,self->titleFont_,self->smallFont_}) if(font) DeleteObject(font);
         self->font_=self->titleFont_=self->smallFont_=nullptr;
         if(self->background_) DeleteObject(self->background_); self->background_=nullptr;
