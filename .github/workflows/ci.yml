@@ -114,7 +114,10 @@ jobs:
         run: ./scripts/installer.ps1 -Architecture ${{ matrix.arch }} -Executable build/${{ matrix.arch }}/Release/Screen.exe
       - name: Test install, launch, upgrade and uninstall
         if: matrix.arch == 'x64'
-        run: ./scripts/test-installer.ps1 -Installer dist/Screen-Setup-1.0.0-x64.exe
+        run: |
+          $identity = Get-Content packaging/store-identity.json -Raw | ConvertFrom-Json
+          $version = ([version]$identity.version).ToString(3)
+          ./scripts/test-installer.ps1 -Installer "dist/Screen-Setup-$version-x64.exe"
       - name: Add download instructions and checksums
         run: |
           Copy-Item packaging/INSTALL.txt -Destination dist/INSTALL.txt

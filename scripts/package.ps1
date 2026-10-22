@@ -5,7 +5,7 @@ param(
     [Parameter(Mandatory)][ValidatePattern('^[A-Za-z0-9.-]{3,50}$')][string]$IdentityName,
     [Parameter(Mandatory)][string]$Publisher,
     [string]$PublisherDisplayName = 'Shardapps',
-    [ValidatePattern('^\d+\.\d+\.\d+\.0$')][string]$Version = '1.0.0.0',
+    [ValidatePattern('^\d+\.\d+\.\d+\.0$')][string]$Version = '1.1.0.0',
     [string]$OutputDirectory = 'dist'
 )
 $ErrorActionPreference = 'Stop'
