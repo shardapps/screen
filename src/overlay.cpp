@@ -78,6 +78,8 @@ OverlayEngine::OverlayEngine(HWND owner, bool overlayOnly) : owner_(owner), over
         desktop_.reset();
         observer_ = nullptr;
         WTSUnRegisterSessionNotification(window);
+        if(virtualManager_) { virtualManager_->Release(); virtualManager_=nullptr; }
+        if(virtualApartment_) CoUninitialize();
     });
     (void)future.get(); // Synchronizes the worker's initialization of control_.
 }
@@ -135,6 +137,7 @@ void OverlayEngine::rebuild() {
 void OverlayEngine::consume() {
     bool persist, refresh, immediate;
     const bool previousWarm = active_.warm;
+    const auto previousDesktop = active_.activeDesktop;
     {
         const std::lock_guard lock(mutex_);
         active_ = desired_;
@@ -146,6 +149,13 @@ void OverlayEngine::consume() {
         pending_ = false;
     }
     if (refresh || surfaces_.empty()) rebuild();
+    if (previousDesktop != active_.activeDesktop && !previousDesktop.empty() && !active_.activeDesktop.empty()) {
+        if(!virtualManager_) {
+            if(!virtualApartment_) virtualApartment_=SUCCEEDED(CoInitializeEx(nullptr,COINIT_APARTMENTTHREADED));
+            CoCreateInstance(CLSID_VirtualDesktopManager,nullptr,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(&virtualManager_));
+        }
+        for(const auto& surface:surfaces_) moveToDesktop(surface.window,active_.activeDesktop,virtualManager_);
+    }
     if (previousWarm != active_.warm) {
         for (const auto& surface : surfaces_) {
             SetWindowLongPtrW(surface.window, GWLP_USERDATA, active_.warm ? 1 : 0);
@@ -239,6 +249,7 @@ void OverlayEngine::tick() {
 void CALLBACK OverlayEngine::windowEvent(HWINEVENTHOOK, DWORD event, HWND window, LONG object, LONG child, DWORD, DWORD) {
     auto* self = observer_;
     if (!self) return;
+    if(event == EVENT_SYSTEM_FOREGROUND && !self->active_.activeDesktop.empty()) PostMessageW(self->owner_,virtualDesktopsChanged,0,0);
     if (event == EVENT_OBJECT_LOCATIONCHANGE &&
         (!window || (GetWindowLongPtrW(window, GWL_EXSTYLE) & WS_EX_TOPMOST) == 0)) return;
     // Retry a previously unreachable Windows band only after a genuine change

@@ -36,6 +36,7 @@ struct App {
     std::vector<screen::Monitor> displays;
     std::unique_ptr<screen::OverlayEngine> engine;
     std::unique_ptr<screen::PreferencesWindow> preferences;
+    std::unique_ptr<screen::VirtualDesktops> workspaces;
     screen::StartupController startup;
     screen::StartupState startupState = screen::StartupState::unknown;
     ~App() {
@@ -44,7 +45,29 @@ struct App {
         if (background) DeleteObject(background);
     }
     int px(int valuePx) const { return MulDiv(valuePx, static_cast<int>(dpi), 96); }
-    int brightness() const { return selected.empty() ? settings.brightness : settings.forMonitor(selected); }
+    int brightness() const { return selected.empty() ? settings.currentBrightness() : settings.forMonitor(selected); }
+    void workspaceTracking(bool settingsOpen = false) {
+        const bool needed = settings.separateDesktops || !settings.monitors.empty() || settingsOpen || (preferences && preferences->window());
+        if (needed && !workspaces) {
+            workspaces=std::make_unique<screen::VirtualDesktops>(window);
+            settings.activeDesktop=workspaces->current();
+            if (engine) workspaces->moveWindow(window);
+        } else if (!needed && workspaces) {
+            workspaces.reset(); settings.activeDesktop.clear();
+        }
+    }
+    void refreshWorkspace(bool notification = false) {
+        if (!workspaces) return;
+        workspaces->refresh(notification);
+        const bool changed = settings.activeDesktop != workspaces->current();
+        settings.activeDesktop = workspaces->current();
+        if (changed) {
+            KillTimer(window,10); animating=false; panelAlpha=0; ShowWindow(window,SW_HIDE);
+            workspaces->moveWindow(window);
+            if (engine) apply(false);
+        }
+        if (preferences) preferences->desktops(workspaces->items());
+    }
     void theme() {
         colors = screen::ui::palette(settings.theme);
         bg=colors.bg; fg=colors.fg; muted=colors.muted; accent=colors.accent; track=colors.track; border=colors.border;
@@ -102,6 +125,7 @@ struct App {
         std::wstring displayName = L"All displays";
         for (size_t i = 0; i < displays.size(); ++i)
             if (displays[i].device == selected) displayName = L"Display " + std::to_wstring(i + 1);
+        if (settings.separateDesktops && workspaces && !settings.activeDesktop.empty()) displayName = workspaces->name() + L" · " + displayName;
         const auto summary = statusText.empty() ? (settings.paused ? L"Paused · " : L"") + displayName +
             (settings.paused ? L"" : desktopCoverage ? L" · Desktop" : L" · Overlay") : statusText;
         SetWindowTextW(footer, summary.c_str());
@@ -109,20 +133,22 @@ struct App {
         if (preferences) preferences->refresh();
         if (trayPresent && !tracking) {
             NOTIFYICONDATAW data{sizeof(data)}; data.hWnd = window; data.uID = 1; data.uFlags = NIF_TIP;
-            const auto tip = settings.paused ? std::wstring(L"Screen Dimmer by Shardapps · Paused") : settings.monitors.empty() ?
-                L"Screen · " + std::to_wstring(settings.brightness) + L"% · " + shortcutText :
-                L"Screen · Per-display dimming · " + shortcutText;
+            auto tip = settings.paused ? std::wstring(L"Screen Dimmer by Shardapps · Paused") :
+                L"Screen · " + std::to_wstring(settings.currentBrightness()) + L"% · " + shortcutText;
+            if (settings.separateDesktops && workspaces) tip += L" · " + workspaces->name();
+            tip.resize(std::min<size_t>(tip.size(),127));
             wcscpy_s(data.szTip, tip.c_str()); Shell_NotifyIconW(NIM_MODIFY, &data);
         }
     }
     void apply(bool persist = true, bool immediate = false, bool tracking = false) {
+        workspaceTracking();
         engine->submit(settings, persist, false, immediate);
         sync(tracking);
     }
     void setBrightness(int level) {
         cancelTimedPause();
         if (selected.empty()) settings.setAll(level);
-        else settings.monitors[selected] = screen::clampBrightness(level);
+        else settings.setMonitor(selected,level);
         settings.paused = false; statusText.clear();
     }
     bool addTray() {
@@ -180,6 +206,7 @@ struct App {
         }
     }
     void show() {
+        refreshWorkspace();
         place();
         if (!IsWindowVisible(window)) { panelAlpha = 0; SetLayeredWindowAttributes(window, 0, 0, LWA_ALPHA); }
         ShowWindow(window, SW_SHOWNOACTIVATE); animate(true);
@@ -215,9 +242,13 @@ struct App {
         registeredShortcut = index; shortcutText = names[index]; return true;
     }
     void openPreferences() {
+        workspaceTracking(true);
+        refreshWorkspace();
         refreshDisplays();
         if (!preferences) preferences = std::make_unique<screen::PreferencesWindow>(settings, displays, selected,
             [this](screen::PreferenceAction action, int amount) { preference(action, amount); });
+        preferences->desktops(workspaces ? workspaces->items() : std::vector<screen::VirtualDesktop>{});
+        if (workspaces) workspaces->moveWindow(preferences->window());
         hide(); preferences->show(window);
         preferences->startupState(startupState, true);
         startup.request(window);
@@ -236,6 +267,17 @@ struct App {
         case warm: settings.warm = amount != 0; break;
         case smooth: settings.smooth = amount != 0; break;
         case resume: settings.resumeOnLaunch = amount != 0; break;
+        case desktopProfiles:
+            settings.separateDesktops = amount != 0; break;
+        case desktopBrightness: {
+            const bool tracking = (amount & 0x10000) != 0;
+            const auto id = preferences->profileDesktop();
+            if (!settings.separateDesktops || !settings.setDesktopBrightness(id,amount & 0xFFFF)) return;
+            if (id == settings.activeDesktop) { cancelTimedPause(); settings.paused=false; statusText.clear(); }
+            apply(!tracking,false,tracking); return;
+        }
+        case resetDesktop:
+            settings.desktops.erase(preferences->profileDesktop()); break;
         case step: settings.adjustmentStep = std::clamp(amount, 1, 10); break;
         case shortcut: {
             const auto previous = registeredShortcut;
@@ -353,6 +395,7 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
     }
     switch (message) {
     case WM_CREATE: {
+        app->workspaceTracking();
         app->dpi = GetDpiForWindow(window); app->theme(); app->refreshDisplays(); app->createControls();
         app->taskbarCreated = RegisterWindowMessageW(L"TaskbarCreated");
         app->icon = static_cast<HICON>(LoadImageW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(1), IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_SHARED));
@@ -406,7 +449,7 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
         if (wParam == 1) { app->cancelTimedPause(); app->settings.paused = !app->settings.paused; app->statusText.clear(); app->apply(); }
         else if (wParam == 2 || wParam == 3) {
             app->cancelTimedPause();
-            app->settings.setAll(app->settings.brightness + (wParam == 2 ? -app->settings.adjustmentStep : app->settings.adjustmentStep));
+            app->settings.setAll(app->settings.currentBrightness() + (wParam == 2 ? -app->settings.adjustmentStep : app->settings.adjustmentStep));
             app->settings.paused = false; app->statusText.clear(); app->apply();
         } else if (wParam == 4) app->restore();
         else if (wParam == 5) { if (IsWindowVisible(window) && (!app->animating || app->opening)) app->hide(); else app->show(); }
@@ -417,6 +460,9 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
             SendMessageW(window, WM_HOTKEY, 5, 0);
         return 0;
     case showMessage: app->show(); return 0;
+    case screen::virtualDesktopsChanged: app->refreshWorkspace(wParam != 0); return 0;
+    case screen::preferencesClosed:
+        app->workspaceTracking(); if(app->engine) app->engine->submit(app->settings); return 0;
     case WM_CONTEXTMENU: app->menu(); return 0;
     case WM_ACTIVATE:
         if (LOWORD(wParam) == WA_INACTIVE && !app->menuActive && IsWindowVisible(window)) app->hide();
@@ -453,7 +499,7 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
     case WM_QUERYENDSESSION: return TRUE;
     case WM_ENDSESSION: if (wParam) DestroyWindow(window); return 0;
     case WM_DESTROY: {
-        KillTimer(window, 10); app->cancelTimedPause(); app->preferences.reset(); app->engine.reset();
+        KillTimer(window, 10); app->cancelTimedPause(); app->preferences.reset(); app->engine.reset(); app->workspaces.reset();
         NOTIFYICONDATAW data{sizeof(data)}; data.hWnd = window; data.uID = 1; Shell_NotifyIconW(NIM_DELETE, &data);
         for (int id = 1; id <= 5; ++id) UnregisterHotKey(window, id);
         PostQuitMessage(0); return 0;

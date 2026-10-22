@@ -183,6 +183,23 @@ try{
   if($theme -in @(1,2,4)){Capture-Slider "slider-theme-$theme.png"}
  }
  Send $preferences 0x0111 1102;Wait-SettingsFile 'theme=2'
+ # Virtual desktop profiles are opt-in and independent of physical displays.
+ Send $preferences 0x0111 1003;Start-Sleep -Milliseconds 130
+ $desktopProfiles=[PreferencesTest]::GetDlgItem($preferences,1300)
+ if([PreferencesTest]::SendMessage($desktopProfiles,0x00F0,[IntPtr]::Zero,[IntPtr]::Zero).ToInt32() -ne 0){throw 'Desktop profiles must be off by default'}
+ if(-not (Read-Text ([PreferencesTest]::GetDlgItem($preferences,1301)))){throw 'Desktop detection must expose a current or unavailable state'}
+ Send $desktopProfiles 0x00F5;Wait-SettingsFile 'separateDesktops=1'
+ $desktopPicker=[PreferencesTest]::GetDlgItem($preferences,1302)
+ if([PreferencesTest]::SendMessage($desktopPicker,0x0146,[IntPtr]::Zero,[IntPtr]::Zero).ToInt64() -gt 0){
+  $desktopLevel=[PreferencesTest]::GetDlgItem($preferences,1303)
+  if(-not [PreferencesTest]::IsWindowEnabled($desktopLevel)){throw 'Detected desktop profile slider must be enabled'}
+  Send $desktopLevel 0x0405 1 61;Send $preferences 0x0114 8 $desktopLevel
+  Start-Sleep -Milliseconds 200
+  if([PreferencesTest]::FileText($settingsFile) -notmatch 'desktop:\{[A-F0-9-]{36}\}:brightness=61'){throw 'Desktop profile level did not persist'}
+ }
+ Capture 'settings-desktops.png'
+ Send $desktopProfiles 0x00F5;Wait-SettingsFile 'separateDesktops=0'
+ Send $preferences 0x0111 1015;Wait-SettingsFile 'brightness=100'
  Send $preferences 0x0111 1002;Start-Sleep -Milliseconds 130
  $step=[PreferencesTest]::GetDlgItem($preferences,1204)
  Send $step 0x014E 1;Send $preferences 0x0111 (1204 -bor (1 -shl 16)) $step;Wait-SettingsFile 'step=2'

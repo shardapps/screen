@@ -10,7 +10,9 @@ constexpr int navBase = 1000, displayId = 1010, levelId = 1011, percentId = 1012
     pauseId = 1013, timerId = 1014, restoreId = 1015, identifyId = 1016, coverageId = 1018,
     presetBase = 1020, themeBase = 1100, warmId = 1200, smoothId = 1201,
     resumeId = 1202, startupId = 1203, stepId = 1204, shortcutId = 1205,
-    systemStartupId = 1206, startupStatusId = 1207;
+    systemStartupId = 1206, startupStatusId = 1207,
+    desktopsEnabledId = 1300, currentDesktopId = 1301, desktopPickerId = 1302,
+    desktopLevelId = 1303, desktopPercentId = 1304, resetDesktopId = 1305;
 constexpr int steps[] = {1,2,5,10};
 constexpr int presets[] = {25,50,75,100};
 void setText(HWND window, const std::wstring& value) {
@@ -26,6 +28,7 @@ PreferencesWindow::PreferencesWindow(Settings& settings, std::vector<Monitor>& d
 PreferencesWindow::~PreferencesWindow() { close(); }
 int PreferencesWindow::px(int value) const { return MulDiv(value, static_cast<int>(dpi_), 96); }
 void PreferencesWindow::show(HWND owner) {
+    owner_=owner;
     if (window_) { refresh(true); ShowWindow(window_, SW_RESTORE); SetForegroundWindow(window_); return; }
     WNDCLASSEXW type{sizeof(type)};
     type.lpfnWndProc = procedure; type.hInstance = GetModuleHandleW(nullptr);
@@ -62,9 +65,10 @@ void PreferencesWindow::createControls() {
     };
     constexpr auto button = WS_TABSTOP | BS_OWNERDRAW;
     constexpr auto combo = WS_TABSTOP | WS_VSCROLL | CBS_DROPDOWNLIST | CBS_OWNERDRAWFIXED | CBS_HASSTRINGS;
-    add(L"BUTTON",L"Displays",button,navBase,-1,24,94,148,36);
-    add(L"BUTTON",L"Appearance",button,navBase+1,-1,186,94,148,36);
-    add(L"BUTTON",L"Preferences",button,navBase+2,-1,348,94,148,36);
+    add(L"BUTTON",L"Displays",button,navBase,-1,24,94,112,36);
+    add(L"BUTTON",L"Appearance",button,navBase+1,-1,144,94,112,36);
+    add(L"BUTTON",L"Preferences",button,navBase+2,-1,264,94,112,36);
+    add(L"BUTTON",L"Desktops",button,navBase+3,-1,384,94,112,36);
     label(L"Choose a screen",0,24,158,472,24);
     add(WC_COMBOBOXW,L"Display",combo,displayId,0,24,188,472,230);
     label(L"Brightness",0,24,252,280,26);
@@ -103,6 +107,18 @@ void PreferencesWindow::createControls() {
     label(L"Checking startup registration…",2,24,478,472,48,startupStatusId);
     add(L"BUTTON",L"Windows startup settings",button,systemStartupId,2,24,536,272,36);
     label(L"Emergency restore: Ctrl + Alt + Shift + F12",2,24,590,472,24);
+
+    add(L"BUTTON",L"Different brightness for each Windows desktop",BS_AUTOCHECKBOX | WS_TABSTOP,desktopsEnabledId,3,24,156,472,38);
+    label(L"Desktop detection unavailable",3,24,206,472,44,currentDesktopId);
+    label(L"Choose a Windows desktop profile",3,24,274,472,24);
+    add(WC_COMBOBOXW,L"Windows desktop profile",combo,desktopPickerId,3,24,306,472,230);
+    label(L"Default brightness",3,24,366,280,26);
+    add(L"STATIC",L"70%",SS_RIGHT | SS_NOPREFIX,desktopPercentId,3,360,354,136,38);
+    const auto desktopSlider=add(TRACKBAR_CLASSW,L"Desktop profile brightness",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,desktopLevelId,3,18,408,484,42);
+    SetWindowSubclass(desktopSlider,ui::sliderProcedure,1,0);
+    SendMessageW(desktopSlider,TBM_SETRANGE,TRUE,MAKELPARAM(minBrightness,maxBrightness));
+    add(L"BUTTON",L"Reset this profile to shared brightness",button,resetDesktopId,3,24,470,472,40);
+    label(L"Switch desktops normally with Windows. Saved levels apply automatically. Fine-tune individual monitors in Displays while that desktop is active.",3,24,530,472,62);
     fonts(); theme(); refresh(true); layout();
 }
 void PreferencesWindow::fonts() {
@@ -112,8 +128,9 @@ void PreferencesWindow::fonts() {
     font_=create(13,FW_NORMAL); titleFont_=create(26,FW_SEMIBOLD); smallFont_=create(11,FW_NORMAL);
     for (const auto& item : items_) SendMessageW(item.window,WM_SETFONT,reinterpret_cast<WPARAM>(font_),TRUE);
     SendMessageW(GetDlgItem(window_,percentId),WM_SETFONT,reinterpret_cast<WPARAM>(titleFont_),TRUE);
+    SendMessageW(GetDlgItem(window_,desktopPercentId),WM_SETFONT,reinterpret_cast<WPARAM>(titleFont_),TRUE);
     for (const auto id : {coverageId,startupStatusId}) SendMessageW(GetDlgItem(window_,id),WM_SETFONT,reinterpret_cast<WPARAM>(smallFont_),TRUE);
-    for (const auto id : {displayId,stepId,shortcutId}) {
+    for (const auto id : {displayId,stepId,shortcutId,desktopPickerId}) {
         SendMessageW(GetDlgItem(window_,id),CB_SETITEMHEIGHT,static_cast<WPARAM>(-1),px(30));
         SendMessageW(GetDlgItem(window_,id),CB_SETITEMHEIGHT,0,px(28));
     }
@@ -150,7 +167,7 @@ void PreferencesWindow::layout() {
     InvalidateRect(window_,nullptr,FALSE); layingOut_ = false;
 }
 void PreferencesWindow::page(int index) {
-    page_=std::clamp(index,0,2); scroll_=0;
+    page_=std::clamp(index,0,3); scroll_=0;
     BOOL allowed=TRUE; SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION,0,&allowed,0);
     animationAlpha_=settings_.smooth && allowed ? 0 : 255;
     layout();
@@ -176,7 +193,7 @@ void PreferencesWindow::refresh(bool rebuildDisplays) {
     int selection=0;
     for (size_t i=0;i<displays_.size();++i) if (displays_[i].device==selected_) selection=static_cast<int>(i)+1;
     if (SendMessageW(combo,CB_GETCURSEL,0,0)!=selection) SendMessageW(combo,CB_SETCURSEL,selection,0);
-    const auto level=selected_.empty()?settings_.brightness:settings_.forMonitor(selected_);
+    const auto level=selected_.empty()?settings_.currentBrightness():settings_.forMonitor(selected_);
     const auto slider=GetDlgItem(window_,levelId);
     if (GetCapture()!=slider && SendMessageW(slider,TBM_GETPOS,0,0)!=level) SendMessageW(slider,TBM_SETPOS,TRUE,level);
     setText(GetDlgItem(window_,percentId),std::to_wstring(level)+L"%");
@@ -197,7 +214,45 @@ void PreferencesWindow::refresh(bool rebuildDisplays) {
     else if(startup_==StartupState::error) startupText=L"Startup could not be updated. Try again or use Windows startup settings.";
     else startupText=L"Launches quietly in the tray. Starts paused unless saved dimming is set to resume. Windows startup settings can override registration.";
     setText(GetDlgItem(window_,startupStatusId),startupText);
+    refreshDesktops(rebuildDisplays);
     refreshing_=false;
+}
+std::wstring PreferencesWindow::profileDesktop() const {
+    if(!window_) return {};
+    const auto index=SendDlgItemMessageW(window_,desktopPickerId,CB_GETCURSEL,0,0);
+    return index>=0 && static_cast<size_t>(index)<desktops_.size()?desktops_[static_cast<size_t>(index)].id:L"";
+}
+void PreferencesWindow::desktops(const std::vector<VirtualDesktop>& items) {
+    const auto selected=profileDesktop(); desktops_=items;
+    if(window_) {
+        refreshDesktops(true);
+        for(size_t i=0;i<desktops_.size();++i) if(desktops_[i].id==selected)
+            SendDlgItemMessageW(window_,desktopPickerId,CB_SETCURSEL,i,0);
+        refreshDesktops(false);
+    }
+}
+void PreferencesWindow::refreshDesktops(bool rebuild) {
+    const auto picker=GetDlgItem(window_,desktopPickerId);
+    auto selected=profileDesktop();
+    if(rebuild) {
+        SendMessageW(picker,CB_RESETCONTENT,0,0);
+        int selection=0;
+        for(size_t i=0;i<desktops_.size();++i) {
+            const auto text=desktops_[i].name+(desktops_[i].id==settings_.activeDesktop?L" · Current":L"");
+            SendMessageW(picker,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(text.c_str()));
+            if(desktops_[i].id==(selected.empty()?settings_.activeDesktop:selected)) selection=static_cast<int>(i);
+        }
+        SendMessageW(picker,CB_SETCURSEL,desktops_.empty()?-1:selection,0);
+    }
+    std::wstring current=L"Desktop detection unavailable · using shared brightness";
+    for(const auto& item:desktops_) if(item.id==settings_.activeDesktop) current=L"Current: "+item.name;
+    setText(GetDlgItem(window_,currentDesktopId),current);
+    SendDlgItemMessageW(window_,desktopsEnabledId,BM_SETCHECK,settings_.separateDesktops?BST_CHECKED:BST_UNCHECKED,0);
+    selected=profileDesktop(); const auto level=settings_.desktopBrightness(selected);
+    const auto slider=GetDlgItem(window_,desktopLevelId);
+    if(GetCapture()!=slider) SendMessageW(slider,TBM_SETPOS,TRUE,level);
+    setText(GetDlgItem(window_,desktopPercentId),std::to_wstring(level)+L"%");
+    for(auto id:{desktopPickerId,desktopLevelId,resetDesktopId}) EnableWindow(GetDlgItem(window_,id),settings_.separateDesktops && !selected.empty());
 }
 void PreferencesWindow::startupState(StartupState state,bool busy) { startup_=state; startupBusy_=busy; refresh(); }
 void PreferencesWindow::identify() {
@@ -228,8 +283,9 @@ void PreferencesWindow::command(int id,int notification) {
         PostMessageW(window_,WM_COMMAND,MAKEWPARAM(id,notification),0);
         return;
     }
-    if(id>=navBase && id<navBase+3 && notification==BN_CLICKED) { page(id-navBase); return; }
+    if(id>=navBase && id<navBase+4 && notification==BN_CLICKED) { page(id-navBase); return; }
     if(id==displayId && notification==CBN_SELCHANGE) action_(PreferenceAction::display,static_cast<int>(SendDlgItemMessageW(window_,id,CB_GETCURSEL,0,0)));
+    else if(id==desktopPickerId && notification==CBN_SELCHANGE) refreshDesktops(false);
     else if(id==stepId && notification==CBN_SELCHANGE) {
         const auto index=static_cast<int>(SendDlgItemMessageW(window_,id,CB_GETCURSEL,0,0));
         if(index>=0 && index<4) action_(PreferenceAction::step,steps[index]);
@@ -241,6 +297,7 @@ void PreferencesWindow::command(int id,int notification) {
         else if(id==timerId) action_(PreferenceAction::timedPause,0);
         else if(id==restoreId) action_(PreferenceAction::restore,0);
         else if(id==identifyId) identify();
+        else if(id==resetDesktopId) action_(PreferenceAction::resetDesktop,0);
         else if(id==systemStartupId) ShellExecuteW(window_,L"open",L"ms-settings:startupapps",nullptr,nullptr,SW_SHOWNORMAL);
         else {
             const auto checked=SendDlgItemMessageW(window_,id,BM_GETCHECK,0,0)==BST_CHECKED;
@@ -248,6 +305,7 @@ void PreferencesWindow::command(int id,int notification) {
             if(id==smoothId) action_(PreferenceAction::smooth,checked);
             if(id==resumeId) action_(PreferenceAction::resume,checked);
             if(id==startupId) action_(PreferenceAction::startup,checked);
+            if(id==desktopsEnabledId) action_(PreferenceAction::desktopProfiles,checked);
         }
     }
     refresh();
@@ -277,7 +335,7 @@ void PreferencesWindow::drawButton(const DRAWITEMSTRUCT& draw) {
         }
         if(settings_.theme==index) ui::roundFill(dc,{rect.right-px(27),rect.top+px(12),rect.right-px(15),rect.top+px(24)},px(12),preview.accent);
     } else {
-        const bool nav=id>=navBase && id<navBase+3;
+        const bool nav=id>=navBase && id<navBase+4;
         const bool active=nav && id-navBase==page_;
         auto fill=colors_.border;
         if(draw.itemState & ODS_SELECTED) fill=colors_.track;
@@ -298,8 +356,8 @@ void PreferencesWindow::drawButton(const DRAWITEMSTRUCT& draw) {
 LRESULT PreferencesWindow::customDraw(NMCUSTOMDRAW& draw) {
     if(draw.dwDrawStage!=CDDS_PREPAINT) return CDRF_DODEFAULT;
     const int id=GetDlgCtrlID(draw.hdr.hwndFrom);
-    if(id==levelId) { ui::drawSlider(draw.hdr.hwndFrom,draw.hdc,colors_,dpi_); return CDRF_SKIPDEFAULT; }
-    if(id>=warmId && id<=startupId) {
+    if(id==levelId || id==desktopLevelId) { ui::drawSlider(draw.hdr.hwndFrom,draw.hdc,colors_,dpi_); return CDRF_SKIPDEFAULT; }
+    if((id>=warmId && id<=startupId) || id==desktopsEnabledId) {
         const auto dc=draw.hdc; auto rect=draw.rc; FillRect(dc,&rect,background_);
         const bool checked=SendMessageW(draw.hdr.hwndFrom,BM_GETCHECK,0,0)==BST_CHECKED;
         const bool enabled=IsWindowEnabled(draw.hdr.hwndFrom)!=FALSE;
@@ -357,6 +415,8 @@ LRESULT CALLBACK PreferencesWindow::procedure(HWND window,UINT message,WPARAM wP
     case WM_HSCROLL:
         if(reinterpret_cast<HWND>(lParam)==GetDlgItem(window,levelId)) self->action_(PreferenceAction::brightness,
             static_cast<int>(SendMessageW(reinterpret_cast<HWND>(lParam),TBM_GETPOS,0,0)) | (LOWORD(wParam)==TB_THUMBTRACK?0x10000:0));
+        else if(reinterpret_cast<HWND>(lParam)==GetDlgItem(window,desktopLevelId)) self->action_(PreferenceAction::desktopBrightness,
+            static_cast<int>(SendMessageW(reinterpret_cast<HWND>(lParam),TBM_GETPOS,0,0)) | (LOWORD(wParam)==TB_THUMBTRACK?0x10000:0));
         return 0;
     case WM_NOTIFY:
         if(reinterpret_cast<NMHDR*>(lParam)->code==NM_CUSTOMDRAW) return self->customDraw(*reinterpret_cast<NMCUSTOMDRAW*>(lParam));
@@ -382,6 +442,7 @@ LRESULT CALLBACK PreferencesWindow::procedure(HWND window,UINT message,WPARAM wP
     case WM_SETTINGCHANGE: case WM_THEMECHANGED: self->theme(); return 0;
     case WM_CLOSE: self->close(); return 0;
     case WM_DESTROY:
+        PostMessageW(self->owner_,preferencesClosed,0,0);
         KillTimer(window,1); self->clearIdentifiers();
         for(auto font:{self->font_,self->titleFont_,self->smallFont_}) if(font) DeleteObject(font);
         self->font_=self->titleFont_=self->smallFont_=nullptr;
