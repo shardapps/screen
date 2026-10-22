@@ -3,6 +3,7 @@
 #include "frame_timer.hpp"
 #include <sstream>
 #include <iostream>
+#include <string_view>
 
 namespace {
 int notifications=0;
@@ -15,7 +16,13 @@ void pump() {
     while(PeekMessageW(&message,nullptr,0,0,PM_REMOVE)) { TranslateMessage(&message); DispatchMessageW(&message); }
 }
 }
-int main() {
+int main(int argc,char** argv) {
+    if(argc==2 && std::string_view(argv[1])=="--inspect-desktops") {
+        screen::VirtualDesktops desktops(nullptr);
+        std::wcout<<L"Detected desktops: "<<desktops.items().size()<<L'\n';
+        for(const auto& item:desktops.items()) std::wcout<<(item.id==desktops.current()?L"* ":L"  ")<<item.name<<L'\n';
+        return desktops.current().empty()?2:0;
+    }
     int failures=0;
     const auto check=[&](bool ok,const char* text){if(!ok){std::cerr<<text<<'\n';++failures;}};
     using namespace screen;

@@ -43,8 +43,6 @@ private:
     bool overlayOnly_ = false, desktopMode_ = false, desktopBlocked_ = false;
     int reportedMode_ = -1;
     DesktopDimmer desktop_;
-    IVirtualDesktopManager* virtualManager_{};
-    bool virtualApartment_ = false;
     SmoothValue desktopAlpha_;
     HWINEVENTHOOK foregroundHook_{}, windowHook_{}, desktopHook_{}, locationHook_{};
     static thread_local OverlayEngine* observer_;

@@ -37,6 +37,6 @@ private:
     void stopWait();
     bool manager();
 };
-// Called on the renderer thread, which owns its COM apartment.
+// The caller owns the desktop manager and its COM apartment.
 void moveToDesktop(HWND window, const std::wstring& id, IVirtualDesktopManager* manager);
 }

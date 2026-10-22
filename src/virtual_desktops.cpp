@@ -91,6 +91,10 @@ void moveToDesktop(HWND window,const std::wstring& id,IVirtualDesktopManager* ma
     if(SUCCEEDED(CLSIDFromString(id.c_str(),&value))) manager->MoveWindowToDesktop(window,value);
 }
 void VirtualDesktops::moveWindow(HWND window) {
+    if(window) {
+        const auto style=GetWindowLongPtrW(window,GWL_EXSTYLE);
+        if((style & WS_EX_TOOLWINDOW) && !(style & WS_EX_APPWINDOW) && !GetWindow(window,GW_OWNER)) return;
+    }
     if(window && !current_.empty() && manager()) moveToDesktop(window,current_,manager_);
 }
 }

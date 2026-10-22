@@ -82,8 +82,6 @@ OverlayEngine::OverlayEngine(HWND owner, bool overlayOnly) : owner_(owner), over
         desktop_.reset();
         observer_ = nullptr;
         WTSUnRegisterSessionNotification(window);
-        if(virtualManager_) { virtualManager_->Release(); virtualManager_=nullptr; }
-        if(virtualApartment_) CoUninitialize();
     });
     (void)future.get(); // Synchronizes the worker's initialization of control_.
 }
@@ -144,7 +142,6 @@ void OverlayEngine::consume() {
     bool persist, refresh, immediate;
     Settings saved;
     const bool previousWarm = active_.warm;
-    const auto previousDesktop = active_.activeDesktop;
     {
         const std::lock_guard lock(mutex_);
         active_ = desired_;
@@ -157,13 +154,8 @@ void OverlayEngine::consume() {
         pending_ = false;
     }
     if (refresh || surfaces_.empty()) rebuild();
-    if (previousDesktop != active_.activeDesktop && !previousDesktop.empty() && !active_.activeDesktop.empty()) {
-        if(!virtualManager_) {
-            if(!virtualApartment_) virtualApartment_=SUCCEEDED(CoInitializeEx(nullptr,COINIT_APARTMENTTHREADED));
-            CoCreateInstance(CLSID_VirtualDesktopManager,nullptr,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(&virtualManager_));
-        }
-        for(const auto& surface:surfaces_) moveToDesktop(surface.window,active_.activeDesktop,virtualManager_);
-    }
+    // Unowned tool windows without WS_EX_APPWINDOW stay outside virtual-desktop
+    // cloaking. Overlays need no shell COM object or per-desktop window clones.
     if (previousWarm != active_.warm) {
         for (const auto& surface : surfaces_) {
             SetWindowLongPtrW(surface.window, GWLP_USERDATA, active_.warm ? 1 : 0);
