@@ -8,6 +8,21 @@ The artifact `Screen-performance-comparison` contains raw samples, median/range 
 
 Frame timers are created lazily and armed only during brightness or flyout motion. One-shot scheduling follows the reported desktop composition rate, capped at 144 Hz, without changing the global timer resolution. A native window timer remains the fallback. The portable smoothing model retains velocity through rapid retargets; all frame timers stop when settled or motion is disabled.
 
+### Alpha 2 comparison result
+
+[Windows CI run 39845380675](https://github.com/shardapps/screen/actions/runs/39845380675), source `b355313`, measured the following medians on one Windows 2025 x64 runner (OS reported 10.0.26100). Five interleaved samples per mode used a two-second warmup and a three-second paused measurement. Both binaries used the same Release MSVC toolchain. Raw samples are retained in the run's `Screen-performance-comparison` artifact.
+
+| Metric | Store alpha baseline | Updated shared mode | Updated desktop profiles |
+| --- | ---: | ---: | ---: |
+| Private committed memory, median | 2.297 MiB | 2.281 MiB | 2.664 MiB |
+| Private committed memory, range | 2.266–2.309 MiB | 2.270–2.301 MiB | 2.629–2.703 MiB |
+| Working set, median | 13.574 MiB | 13.582 MiB | 20.359 MiB |
+| Process CPU time over 3 seconds, median | 0 ms measured | 0 ms measured | 0 ms measured |
+
+The updated executable was 518,656 bytes, compared with 482,304 bytes for the baseline. Shared-mode private memory remains within baseline variation. Desktop profiles add registry observation and, where Explorer metadata is unavailable on the hosted desktop, public shell fallback; Windows may load additional shared pages and thread-pool workers. Three saved profiles were loaded, but this runner did not expose ordinary Task View desktops. The local read-only diagnostic separately detected three named desktops on the user's Windows 11 machine.
+
+These short, paused samples do not establish literal zero CPU, active rendering cost, frame delivery, or real desktop-switch latency. Display refresh, HDR and power state were not recorded for this paused comparison; compositor/GPU allocations are excluded. Real multi-monitor/HDR and Task View transitions remain manual acceptance cases.
+
 ## v0.4.0 native settings sample
 
 Measured October 19, 2026 with the same Release x64 compiler/OS/display setup as below. Each row starts a separate process, settles for two seconds after the requested state, and measures process CPU over ten seconds. Settings and startup registrations were restored after tests.

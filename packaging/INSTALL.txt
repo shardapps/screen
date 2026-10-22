@@ -10,8 +10,8 @@ run Screen.exe from the extracted folder. This does not install the app.
 
 These are unsigned developer previews. Windows may show an unknown
 publisher or SmartScreen warning. Organizational application-control
-policies may block unsigned software; use approved distribution through
-your administrator or a future signed/Store build in that case.
+policies may block unsigned software; the Microsoft Store release is available at
+https://apps.microsoft.com/detail/9PNHDHKMHDLG (Store updates arrive separately).
 
 Screen starts paused by default. Settings offers opt-in saved-dimming resume. Move the slider to enable dimming. Alt+S opens or
 hides the compact panel above the bottom-right taskbar (Ctrl+Alt+S is the
@@ -27,3 +27,6 @@ Source, documentation and issue reports: https://github.com/shardapps/screen
 
 Use the flyout settings icon for screen selection, six themes plus System,
 brightness presets, timed pause, shortcut/step choices, and opt-in Windows startup.
+Settings > Desktops enables different brightness for Windows Task View desktops.
+To resume saved dimming at sign-in, enable both Start with Windows and
+Apply saved brightness when Screen opens in Preferences.
