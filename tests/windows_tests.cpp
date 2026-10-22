@@ -101,6 +101,8 @@ int main(int argc,char** argv) {
             check(frame.arm(),"The next frame can be scheduled");frame.cancel();
             check(!frame.handle(),"Settled or reduced-motion transitions leave no armed timer");
         } else std::cout<<"SKIP: high-resolution timer unavailable; app uses native window-timer fallback\n";
+        PostQuitMessage(0);
+        check(frame.wait(message)==FrameTimer::Event::quit,"A quit condition must be drained before another input wait");
     }
     return failures?1:0;
 }

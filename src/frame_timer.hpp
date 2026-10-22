@@ -32,11 +32,13 @@ public:
     HANDLE handle() const { return armed_?timer_:nullptr; }
     Event wait(MSG& message) {
         for(;;) {
+            // WM_QUIT is a queue condition rather than a normal posted input.
+            // Drain it (and sent messages) before sleeping again after dispatch.
+            if(PeekMessageW(&message,nullptr,0,0,PM_REMOVE)) return message.message==WM_QUIT?Event::quit:Event::message;
             const auto timer=handle();
             const auto result=MsgWaitForMultipleObjectsEx(timer?1:0,timer?&timer:nullptr,INFINITE,QS_ALLINPUT,MWMO_INPUTAVAILABLE);
             if(result==WAIT_FAILED) return Event::error;
             if(timer && result==WAIT_OBJECT_0) { armed_=false;return Event::frame; }
-            if(PeekMessageW(&message,nullptr,0,0,PM_REMOVE)) return message.message==WM_QUIT?Event::quit:Event::message;
         }
     }
 private:

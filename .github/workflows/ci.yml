@@ -62,7 +62,7 @@ jobs:
         if: always() && matrix.arch == 'x64'
         with:
           name: Screen-performance-comparison
-          path: build/performance-comparison.json
+          path: build/performance-comparison*.json
           if-no-files-found: warn
           retention-days: 90
       - name: Check full-desktop dimming and cleanup
