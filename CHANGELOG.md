@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.0 — Alpha 2
 
 - Add opt-in brightness profiles for named Windows virtual desktops, with independent physical-monitor overrides and a shared fallback.
 - Add a Desktops settings page to edit detected profiles without switching the Windows desktop.

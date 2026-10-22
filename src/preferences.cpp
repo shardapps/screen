@@ -260,7 +260,8 @@ void PreferencesWindow::refreshDesktops(bool rebuild) {
             SendMessageW(picker,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(text.c_str()));
             if(desktops_[i].id==(selected.empty()?settings_.activeDesktop:selected)) selection=static_cast<int>(i);
         }
-        SendMessageW(picker,CB_SETCURSEL,desktops_.empty()?-1:selection,0);
+        if(desktops_.empty()) SendMessageW(picker,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(L"No Windows desktop detected"));
+        SendMessageW(picker,CB_SETCURSEL,selection,0);
     }
     std::wstring current=L"Desktop detection unavailable · using shared brightness";
     for(const auto& item:desktops_) if(item.id==settings_.activeDesktop) current=L"Current: "+item.name;

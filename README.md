@@ -22,6 +22,8 @@ Screen by **Shardapps** dims Windows desktop output using a full-desktop color t
 
 **Status: Alpha 1 (v1.0.0), available in the [Microsoft Store](https://apps.microsoft.com/detail/9PNHDHKMHDLG).** **Screen Dimmer by Shardapps** is listed under the registered publisher **ShardCoders**. CI also produces per-user setup EXEs, portable ZIPs and Store packages. Unsigned MSIX files require Store signing and are not normal local installers.
 
+**Next update: Alpha 2 (v1.1.0).** Adds Windows virtual desktop profiles, fixes the blank display picker, refines all themes and improves animation pacing. Store publication is pending; [build artifacts](https://github.com/shardapps/screen/actions/workflows/ci.yml) contain developer previews.
+
 ## Built to stay out of your way
 
 | Feature | What you get |
@@ -44,7 +46,7 @@ Screen by **Shardapps** dims Windows desktop output using a full-desktop color t
 <details>
 <summary>See the actual Windows app</summary>
 
-<img src="docs/assets/screenshot.png" alt="Actual Screen v0.4.0 compact Windows 11 flyout with a brightness slider, percentage and Alt+S shortcut" width="380" />
+<img src="docs/assets/screenshot.png" alt="Actual compact Windows 11 brightness flyout with a percentage and Alt+S shortcut" width="380" />
 
 The compact flyout at 150% display scaling. The hero above is an interface illustration.
 
@@ -59,10 +61,10 @@ The compact flyout at 150% display scaling. The hero above is an interface illus
 
 1. Open a successful [Windows CI run](https://github.com/shardapps/screen/actions/workflows/ci.yml). GitHub requires sign-in to download workflow artifacts.
 2. Download `Screen-preview-x64` for an Intel/AMD PC, or `Screen-preview-arm64` for Windows on Arm, and extract the artifact ZIP.
-3. Quit any older Screen copy from its tray menu, then run **`Screen-Setup-1.0.0-x64.exe`** (or ARM64 setup). It updates the existing per-user installation, adds a Start menu shortcut, and supports uninstall through **Settings → Apps**. Alternatively, extract the portable ZIP completely and run `Screen.exe`. These previews are unsigned; Windows may show an unknown publisher/SmartScreen warning, and managed policies may block them. Review the source/build before running them.
-4. Move the slider to enable dimming. Screen starts paused by default. Click the settings icon for **Displays**, **Appearance**, and **Preferences**. Choose a screen directly from the flyout footer or in settings. Your selection and preferences are retained.
+3. Quit any older Screen copy from its tray menu, then run **`Screen-Setup-1.1.0-x64.exe`** (or ARM64 setup). It updates the existing per-user installation, adds a Start menu shortcut, and supports uninstall through **Settings → Apps**. Alternatively, extract the portable ZIP completely and run `Screen.exe`. These previews are unsigned; Windows may show an unknown publisher/SmartScreen warning, and managed policies may block them. Review the source/build before running them.
+4. Move the slider to enable dimming. Screen starts paused by default. Click the settings icon for **Displays**, **Appearance**, **Preferences** and **Desktops**. Choose a screen directly from the flyout footer or in settings. Enable desktop profiles under Desktops to keep different levels for Task View workspaces. Your selection and preferences are retained.
 
-Alt+S toggles the flyout. Click outside it or press Escape to dismiss it while dimming continues. Choose **Quit** in the tray menu to stop Screen and restore the desktop. `Screen.exe --background` starts quietly in the tray. Enable **Start with Windows** in Preferences to launch at sign-in. **Resume saved dimming when Screen opens** is a separate opt-in; `Screen.exe --paused` overrides it for recovery. Choose Alt+S, Ctrl+Alt+S or Ctrl+Shift+S as the opening shortcut.
+Alt+S toggles the flyout. Click outside it or press Escape to dismiss it while dimming continues. Choose **Quit** in the tray menu to stop Screen and restore the desktop. `Screen.exe --background` starts quietly in the tray. Enable **Start with Windows** in Preferences to launch at sign-in. **Apply saved brightness when Screen opens** is a separate opt-in; enable both to restore brightness at sign-in. `Screen.exe --paused` overrides it for recovery. Choose Alt+S, Ctrl+Alt+S or Ctrl+Shift+S as the opening shortcut.
 
 **MSIX install error?** `Screen-msix-validation-*` artifacts contain unsigned packages for packaging development. Windows App Installer does not accept them as normal trusted installers. Use the setup EXE or portable app above; see [installation help](docs/INSTALLATION.md).
 

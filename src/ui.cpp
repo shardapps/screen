@@ -49,7 +49,9 @@ void text(HDC dc, RECT rect, std::wstring_view value, COLORREF color, UINT flags
     SetBkMode(dc, TRANSPARENT); SetTextColor(dc, color);
     DrawTextW(dc, value.data(), static_cast<int>(value.size()), &rect, flags | DT_NOPREFIX);
 }
-void drawSlider(HWND slider, HDC target, const Palette& colors, UINT dpi) {
+void drawSlider(HWND slider, HDC target, const Palette& sourceColors, UINT dpi) {
+    auto colors=sourceColors;
+    if(!IsWindowEnabled(slider)) colors.accent=blend(colors.bg,colors.muted,0.5);
     RECT client{}, channel{}, thumb{}; GetClientRect(slider, &client);
     if (!client.right || !client.bottom) return;
     SendMessageW(slider, TBM_GETCHANNELRECT, 0, reinterpret_cast<LPARAM>(&channel));

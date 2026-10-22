@@ -210,7 +210,7 @@ try{
  if(-not (Read-Text ([PreferencesTest]::GetDlgItem($preferences,1301)))){throw 'Desktop detection must expose a current or unavailable state'}
  Send $desktopProfiles 0x00F5;Wait-SettingsFile 'separateDesktops=1'
  $desktopPicker=[PreferencesTest]::GetDlgItem($preferences,1302)
- if([PreferencesTest]::SendMessage($desktopPicker,0x0146,[IntPtr]::Zero,[IntPtr]::Zero).ToInt64() -gt 0){
+ if([PreferencesTest]::IsWindowEnabled($desktopPicker)){
   $desktopLevel=[PreferencesTest]::GetDlgItem($preferences,1303)
   if(-not [PreferencesTest]::IsWindowEnabled($desktopLevel)){throw 'Detected desktop profile slider must be enabled'}
   Send $desktopLevel 0x0405 1 61;Send $preferences 0x0114 8 $desktopLevel
