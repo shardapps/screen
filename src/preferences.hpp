@@ -37,6 +37,9 @@ private:
     StartupState startup_ = StartupState::unknown;
     bool startupBusy_ = false, refreshing_ = false, layingOut_ = false;
     int appliedTheme_ = -1;
+    ui::Palette themeFrom_{}, themeTarget_{};
+    std::chrono::steady_clock::time_point themeStart_{}, pageStart_{};
+    bool themeAnimating_ = false;
     std::vector<Item> items_;
     std::vector<VirtualDesktop> desktops_;
     std::vector<HWND> identifiers_;
@@ -47,6 +50,7 @@ private:
     void createControls();
     void layout();
     void theme();
+    void applyColors(const ui::Palette& colors);
     void fonts();
     void page(int index);
     void identify();
