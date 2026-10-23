@@ -1,6 +1,7 @@
 #include "settings.hpp"
 #include "virtual_desktops.hpp"
 #include "frame_timer.hpp"
+#include "brightness_keys.hpp"
 #include <sstream>
 #include <iostream>
 #include <string_view>
@@ -17,6 +18,12 @@ void pump() {
 }
 }
 int main(int argc,char** argv) {
+    if(argc==2 && std::string_view(argv[1])=="--inspect-brightness-keys") {
+        screen::BrightnessKeys keys;
+        std::cout<<"Consumer HID collections advertising display brightness keys: "<<keys.supportedDevices()<<'\n';
+        std::cout<<"Read-only capability check; no input listener, hardware change or key recording. Firmware-only Fn keys may not appear.\n";
+        return 0;
+    }
     if(argc==2 && std::string_view(argv[1])=="--inspect-desktops") {
         screen::VirtualDesktops desktops(nullptr);
         std::wcout<<L"Detected desktops: "<<desktops.items().size()<<L'\n';
@@ -28,9 +35,16 @@ int main(int argc,char** argv) {
     using namespace screen;
     const std::wstring a=L"{11111111-1111-1111-1111-111111111111}",b=L"{22222222-2222-2222-2222-222222222222}";
     Settings saved; saved.brightness=83; saved.monitors[L"DISPLAY-A"]=47;
+    check(!saved.brightnessKeys,"Brightness-key control is off by default");
+    std::wistringstream keyOptIn(L"brightnessKeys=2\n");
+    check(!parseSettings(keyOptIn).brightnessKeys,"Only explicit value 1 enables the input listener");
+    saved.brightnessKeys=true;
+    saved.brightnessKeyFeedback=false;
     saved.separateDesktops=true; saved.resumeOnLaunch=true; saved.activeDesktop=a;
     saved.setAll(18); saved.activeDesktop=b; saved.setMonitor(L"DISPLAY-A",55);
     std::wstringstream text; writeSettings(text,saved); auto loaded=parseSettings(text);
+    check(loaded.brightnessKeys,"Brightness-key opt-in survives a settings round trip");
+    check(!loaded.brightnessKeyFeedback,"The independent mini-panel preference survives restart");
     check(!loaded.paused && loaded.separateDesktops && loaded.activeDesktop.empty(),"Persist options but never persist stale active desktop context");
     loaded.activeDesktop=a;
     check(loaded.currentBrightness()==18 && loaded.forMonitor(L"DISPLAY-A")==18,"Round-trip must preserve a cleared profile override map");
@@ -83,6 +97,27 @@ int main(int argc,char** argv) {
     for(int i=0;i<20;++i) { VirtualDesktops repeated(window,path); }
     GetProcessHandleCount(GetCurrentProcess(),&after);
     check(after<=before+2,"Repeated desktop observer creation must not leak registry or wait handles");
+    const auto brightnessRegistration=[] {
+        UINT count=0;GetRegisteredRawInputDevices(nullptr,&count,sizeof(RAWINPUTDEVICE));
+        std::vector<RAWINPUTDEVICE> registered(count);
+        if(count && GetRegisteredRawInputDevices(registered.data(),&count,sizeof(RAWINPUTDEVICE))!=UINT(-1))
+            for(const auto& value:registered) if(value.usUsagePage==0x0c && value.usUsage==1) return true;
+        return false;
+    };
+    check(!brightnessRegistration(),"No consumer-input registration before explicit opt-in");
+    {
+        BrightnessKeys keys;
+        check(!keys.start(nullptr) && !brightnessRegistration(),"Invalid owner cannot register background input");
+        check(keys.start(window) && brightnessRegistration(),"Opt-in registers the consumer collection in this process");
+        check(keys.input(nullptr,100).direction==0 && !keys.repeating(),"Invalid raw-input handles cannot change brightness or start repeats");
+        keys.clear();keys.removed(reinterpret_cast<HANDLE>(1));
+        check(!keys.repeating(),"Unknown unplug and explicit reset are safe");
+    }
+    check(!brightnessRegistration(),"Disabling removes the consumer-input registration");
+    DWORD keyBefore=0,keyAfter=0;GetProcessHandleCount(GetCurrentProcess(),&keyBefore);
+    for(int i=0;i<20;++i) { BrightnessKeys keys;check(keys.start(window),"Repeated input enable must succeed"); }
+    GetProcessHandleCount(GetCurrentProcess(),&keyAfter);
+    check(keyAfter<=keyBefore+2 && !brightnessRegistration(),"Repeated enable/disable releases module, session and registration resources");
     DestroyWindow(window);RegCloseKey(root);RegDeleteTreeW(HKEY_CURRENT_USER,path.c_str());
     pump();
     {

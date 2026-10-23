@@ -12,7 +12,8 @@ constexpr int navBase = 1000, displayId = 1010, levelId = 1011, percentId = 1012
     resumeId = 1202, startupId = 1203, stepId = 1204, shortcutId = 1205,
     systemStartupId = 1206, startupStatusId = 1207,
     desktopsEnabledId = 1300, currentDesktopId = 1301, desktopPickerId = 1302,
-    desktopLevelId = 1303, desktopPercentId = 1304, resetDesktopId = 1305;
+    desktopLevelId = 1303, desktopPercentId = 1304, resetDesktopId = 1305,
+    brightnessKeysId = 1400, testKeysId = 1401, keyStatusId = 1402, keyFeedbackId = 1403;
 constexpr int steps[] = {1,2,5,10};
 constexpr int presets[] = {25,50,75,100};
 void setText(HWND window, const std::wstring& value) {
@@ -67,10 +68,8 @@ void PreferencesWindow::createControls() {
     };
     constexpr auto button = WS_TABSTOP | BS_OWNERDRAW;
     constexpr auto combo = WS_TABSTOP | WS_VSCROLL | CBS_DROPDOWNLIST | CBS_OWNERDRAWFIXED | CBS_HASSTRINGS;
-    add(L"BUTTON",L"Displays",button,navBase,-1,24,94,112,36);
-    add(L"BUTTON",L"Appearance",button,navBase+1,-1,144,94,112,36);
-    add(L"BUTTON",L"Preferences",button,navBase+2,-1,264,94,112,36);
-    add(L"BUTTON",L"Desktops",button,navBase+3,-1,384,94,112,36);
+    constexpr const wchar_t* pages[]={L"Displays",L"Appearance",L"Preferences",L"Desktops",L"Keyboard"};
+    for(int i=0;i<5;++i) add(L"BUTTON",pages[i],button,navBase+i,-1,24+i*96,94,88,36);
     label(L"Choose a screen",0,24,158,472,24);
     add(WC_COMBOBOXW,L"Display",combo,displayId,0,24,188,472,230);
     label(L"Brightness",0,24,252,280,26);
@@ -121,6 +120,14 @@ void PreferencesWindow::createControls() {
     SendMessageW(desktopSlider,TBM_SETRANGE,TRUE,MAKELPARAM(minBrightness,maxBrightness));
     add(L"BUTTON",L"Reset this profile to shared brightness",button,resetDesktopId,3,24,470,472,40);
     label(L"Switch desktops normally with Windows. Saved levels apply automatically. Fine-tune individual monitors in Displays while that desktop is active.",3,24,530,472,62);
+    label(L"Your keyboard, your screen",4,24,158,472,24);
+    add(L"BUTTON",L"Use keyboard brightness keys (beta)",BS_AUTOCHECKBOX | WS_TABSTOP,brightnessKeysId,4,24,202,472,38);
+    add(L"BUTTON",L"Show mini panel for keyboard changes",BS_AUTOCHECKBOX | WS_TABSTOP,keyFeedbackId,4,24,246,472,38);
+    label(L"Adjusts app brightness for the selected screen and current desktop profile. The mini panel appears briefly without taking focus.",4,24,300,472,48);
+    add(L"BUTTON",L"Test brightness keys",button,testKeysId,4,24,360,228,40);
+    label(L"Off. Run the test to check your keyboard.",4,24,420,472,48,keyStatusId);
+    label(L"Your laptop may also change its hardware brightness. If both changes feel too strong, turn this option off. Firmware-only Fn keys cannot be detected.",4,24,484,472,64);
+    label(L"Fallback: Ctrl + Alt + Up / Down adjusts all displays in the current desktop profile. Change the step in Preferences.",4,24,568,472,48);
     fonts(); theme(); refresh(true); layout();
 }
 void PreferencesWindow::fonts() {
@@ -167,7 +174,7 @@ void PreferencesWindow::layout() {
     layingOut_ = true;
     RECT client{}; GetClientRect(window_,&client);
     const auto height = MulDiv(client.bottom,96,static_cast<int>(dpi_));
-    const int content = page_ == 2 ? 638 : 604;
+    const int content = page_ == 2 || page_ == 4 ? 638 : 604;
     scroll_ = std::clamp(scroll_,0,std::max(0,content-height));
     SCROLLINFO info{sizeof(info),SIF_RANGE | SIF_PAGE | SIF_POS,0,content-1,static_cast<UINT>(std::max(1,height)),scroll_,0};
     SetScrollInfo(window_,SB_VERT,&info,TRUE); GetClientRect(window_,&client);
@@ -181,7 +188,7 @@ void PreferencesWindow::layout() {
     InvalidateRect(window_,nullptr,FALSE); layingOut_ = false;
 }
 void PreferencesWindow::page(int index) {
-    page_=std::clamp(index,0,3); scroll_=0;
+    page_=std::clamp(index,0,4); scroll_=0;
     BOOL allowed=TRUE; SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION,0,&allowed,0);
     animationAlpha_=settings_.smooth && allowed ? 0 : 255;
     pageStart_=std::chrono::steady_clock::now();
@@ -193,6 +200,8 @@ void PreferencesWindow::page(int index) {
 void PreferencesWindow::refresh(bool rebuildDisplays) {
     if (!window_ || refreshing_) return;
     refreshing_=true;
+    SendDlgItemMessageW(window_,brightnessKeysId,BM_SETCHECK,settings_.brightnessKeys?BST_CHECKED:BST_UNCHECKED,0);
+    SendDlgItemMessageW(window_,keyFeedbackId,BM_SETCHECK,settings_.brightnessKeyFeedback?BST_CHECKED:BST_UNCHECKED,0);
     if (appliedTheme_ != settings_.theme || rebuildDisplays) theme();
     const auto combo=GetDlgItem(window_,displayId);
     if (rebuildDisplays) {
@@ -274,6 +283,11 @@ void PreferencesWindow::refreshDesktops(bool rebuild) {
     for(auto id:{desktopPickerId,desktopLevelId,resetDesktopId}) EnableWindow(GetDlgItem(window_,id),settings_.separateDesktops && !selected.empty());
 }
 void PreferencesWindow::startupState(StartupState state,bool busy) { startup_=state; startupBusy_=busy; refresh(); }
+void PreferencesWindow::brightnessKeyStatus(const std::wstring& text,bool testing) {
+    if(!window_) return;
+    setText(GetDlgItem(window_,keyStatusId),text);
+    setText(GetDlgItem(window_,testKeysId),testing?L"Stop test":L"Test brightness keys");
+}
 void PreferencesWindow::identify() {
     clearIdentifiers();
     identifierFont_=CreateFontW(-px(64),0,0,0,FW_SEMIBOLD,FALSE,FALSE,FALSE,DEFAULT_CHARSET,
@@ -302,7 +316,7 @@ void PreferencesWindow::command(int id,int notification) {
         PostMessageW(window_,WM_COMMAND,MAKEWPARAM(id,notification),0);
         return;
     }
-    if(id>=navBase && id<navBase+4 && notification==BN_CLICKED) { page(id-navBase); return; }
+    if(id>=navBase && id<navBase+5 && notification==BN_CLICKED) { page(id-navBase); return; }
     if(id==displayId && notification==CBN_SELCHANGE) action_(PreferenceAction::display,static_cast<int>(SendDlgItemMessageW(window_,id,CB_GETCURSEL,0,0)));
     else if(id==desktopPickerId && notification==CBN_SELCHANGE) refreshDesktops(false);
     else if(id==stepId && notification==CBN_SELCHANGE) {
@@ -317,6 +331,7 @@ void PreferencesWindow::command(int id,int notification) {
         else if(id==restoreId) action_(PreferenceAction::restore,0);
         else if(id==identifyId) identify();
         else if(id==resetDesktopId) action_(PreferenceAction::resetDesktop,0);
+        else if(id==testKeysId) action_(PreferenceAction::testBrightnessKeys,0);
         else if(id==systemStartupId) ShellExecuteW(window_,L"open",L"ms-settings:startupapps",nullptr,nullptr,SW_SHOWNORMAL);
         else {
             const auto checked=SendDlgItemMessageW(window_,id,BM_GETCHECK,0,0)==BST_CHECKED;
@@ -325,6 +340,8 @@ void PreferencesWindow::command(int id,int notification) {
             if(id==resumeId) action_(PreferenceAction::resume,checked);
             if(id==startupId) action_(PreferenceAction::startup,checked);
             if(id==desktopsEnabledId) action_(PreferenceAction::desktopProfiles,checked);
+            if(id==brightnessKeysId) action_(PreferenceAction::brightnessKeys,checked);
+            if(id==keyFeedbackId) action_(PreferenceAction::brightnessKeyFeedback,checked);
         }
     }
     refresh();
@@ -354,7 +371,7 @@ void PreferencesWindow::drawButton(const DRAWITEMSTRUCT& draw) {
         }
         if(settings_.theme==index) ui::roundFill(dc,{rect.right-px(27),rect.top+px(12),rect.right-px(15),rect.top+px(24)},px(12),preview.accent);
     } else {
-        const bool nav=id>=navBase && id<navBase+4;
+        const bool nav=id>=navBase && id<navBase+5;
         const bool active=nav && id-navBase==page_;
         POINT pointer{};GetCursorPos(&pointer);const bool hot=WindowFromPoint(pointer)==draw.hwndItem;
         const bool pressed=(draw.itemState & ODS_SELECTED)!=0,enabled=IsWindowEnabled(draw.hwndItem)!=FALSE;
@@ -380,7 +397,7 @@ LRESULT PreferencesWindow::customDraw(NMCUSTOMDRAW& draw) {
     if(draw.dwDrawStage!=CDDS_PREPAINT) return CDRF_DODEFAULT;
     const int id=GetDlgCtrlID(draw.hdr.hwndFrom);
     if(id==levelId || id==desktopLevelId) { ui::drawSlider(draw.hdr.hwndFrom,draw.hdc,colors_,dpi_); return CDRF_SKIPDEFAULT; }
-    if((id>=warmId && id<=startupId) || id==desktopsEnabledId) {
+    if((id>=warmId && id<=startupId) || id==desktopsEnabledId || id==brightnessKeysId || id==keyFeedbackId) {
         const auto dc=draw.hdc; auto rect=draw.rc; FillRect(dc,&rect,background_);
         const bool checked=SendMessageW(draw.hdr.hwndFrom,BM_GETCHECK,0,0)==BST_CHECKED;
         const bool enabled=IsWindowEnabled(draw.hdr.hwndFrom)!=FALSE;

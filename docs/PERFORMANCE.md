@@ -6,6 +6,8 @@ The x64 Windows CI job builds the pinned Store alpha source (`0a4ecf9`) and the 
 
 The artifact `Screen-performance-comparison` contains raw samples, median/range private commit, working set, CPU deltas, executable sizes and OS context. CI investigates a shared-tray private-memory regression above 20%, a binary above 1 MiB or a material paused CPU increase. Profile-mode costs are reported separately rather than silently compared with a simpler baseline. These are paused-process measurements, not compositor/GPU memory, an animation smoothness benchmark or proof of real Task View switching.
 
+The beta adds a fourth paused mode with brightness-key listening explicitly enabled. Compare it with ordinary shared mode to assess the optional HID parser/registration cost; the off state does not create that listener. Held-key repeat and mini-panel feedback are inactive during these idle measurements. Real key delivery and active input/rendering costs remain separate acceptance cases.
+
 Frame timers are created lazily and armed only during brightness or flyout motion. One-shot scheduling follows the reported desktop composition rate, capped at 144 Hz, without changing the global timer resolution. A native window timer remains the fallback. The portable smoothing model retains velocity through rapid retargets; all frame timers stop when settled or motion is disabled.
 
 ### Alpha 2 comparison result

@@ -5,7 +5,7 @@
          xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
          IgnorableNamespaces="uap uap5 rescap">
   <!-- Preview identity only. The packaging script replaces it with explicit arguments. -->
-  <Identity Name="Shardapps.Screen.Preview" Publisher="CN=Shardapps-Preview" Version="1.1.0.0" ProcessorArchitecture="x64" />
+  <Identity Name="Shardapps.Screen.Preview" Publisher="CN=Shardapps-Preview" Version="1.2.0.0" ProcessorArchitecture="x64" />
   <Properties>
     <DisplayName>Screen Dimmer by Shardapps</DisplayName>
     <PublisherDisplayName>Shardapps</PublisherDisplayName>

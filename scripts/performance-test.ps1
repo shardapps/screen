@@ -21,9 +21,9 @@ $hadSettings=Test-Path -LiteralPath $settingsFile
 $savedBytes=if($hadSettings){[IO.File]::ReadAllBytes($settingsFile)}else{$null}
 $process=$null
 $rows=[Collections.Generic.List[object]]::new()
-function Measure-Screen([string]$path,[string]$mode,[bool]$profiles){
+function Measure-Screen([string]$path,[string]$mode,[bool]$profiles,[bool]$keys=$false){
  Write-Output "Measuring $mode"
- $settings="brightness=70`nresume=0`nsmooth=1`nseparateDesktops=$([int]$profiles)`n"
+ $settings="brightness=70`nresume=0`nsmooth=1`nseparateDesktops=$([int]$profiles)`nbrightnessKeys=$([int]$keys)`n"
  if($profiles){
   foreach($index in 1..3){$id='{'+('{0:X8}' -f $index)+'-0000-0000-0000-000000000001}';$settings+="desktop:$($id):brightness=45`n"}
  }
@@ -49,8 +49,8 @@ function Median($values){$sorted=@($values | Sort-Object);$n=$sorted.Count;if($n
 try{
  [void][IO.Directory]::CreateDirectory((Split-Path -Parent $settingsFile))
  # Interleave samples to reduce run-order bias on the same hosted machine.
- foreach($sample in 1..$Samples){Measure-Screen $BaselineExecutable 'baseline-shared' $false;Measure-Screen $Executable 'current-shared' $false;Measure-Screen $Executable 'current-profiles' $true}
- $summary=@(foreach($mode in @('baseline-shared','current-shared','current-profiles')){
+ foreach($sample in 1..$Samples){Measure-Screen $BaselineExecutable 'baseline-shared' $false;Measure-Screen $Executable 'current-shared' $false;Measure-Screen $Executable 'current-profiles' $true;Measure-Screen $Executable 'current-brightness-keys' $false $true}
+ $summary=@(foreach($mode in @('baseline-shared','current-shared','current-profiles','current-brightness-keys')){
   $group=@($rows | Where-Object { $_.mode -eq $mode })
   [ordered]@{mode=$mode;medianPrivateMiB=(Median $group.privateMiB);minPrivateMiB=($group.privateMiB | Measure-Object -Minimum).Minimum;maxPrivateMiB=($group.privateMiB | Measure-Object -Maximum).Maximum;medianWorkingSetMiB=(Median $group.workingSetMiB);medianCpuMilliseconds=(Median $group.cpuMilliseconds)}
  })

@@ -1,5 +1,6 @@
 #include "core.hpp"
 #include "color.hpp"
+#include "brightness_key_state.hpp"
 #include <cstdlib>
 #include <iostream>
 #include <limits>
@@ -10,6 +11,22 @@ int main() {
         if (!ok) { std::cerr << message << '\n'; ++failures; }
     };
     using namespace screen;
+    check(validBrightnessReportBatch(8,2,4) && !validBrightnessReportBatch(7,2,4),"HID batches must fit their packet without truncation");
+    check(!validBrightnessReportBatch(8,0,1) && !validBrightnessReportBatch(8,1,0),"Empty HID reports cannot divide by zero or apply an input");
+    check(!validBrightnessReportBatch(65537,1,1) && !validBrightnessReportBatch(8192,8192,1) && !validBrightnessReportBatch(65,1,65),"Untrusted report allocations and batch work are bounded");
+    BrightnessKeyState keys;
+    check(!keys.repeating() && keys.update(0,100)==0,"No key means no repeat timer");
+    check(keys.update(BrightnessKeyState::down,100)==-1,"Brightness down reacts immediately");
+    check(keys.update(BrightnessKeyState::down,200)==0,"Duplicate HID states must not double-apply a press");
+    check(keys.repeat(599)==0 && keys.repeat(600)==-1,"Held keys respect the initial repeat delay");
+    check(keys.repeat(601)==0 && keys.repeat(2000)==-1 && keys.repeat(2000)==0,"A delayed UI never replays a repeat backlog");
+    check(keys.repeat(3100)==0 && !keys.repeating(),"Missing release stops repeating after three seconds");
+    check(keys.update(BrightnessKeyState::down,3200)==0,"A stuck key cannot restart the safety timeout");
+    check(keys.update(0,3300)==0 && keys.update(BrightnessKeyState::up,3400)==1,"Release permits the next genuine press");
+    check(keys.update(3,3450)==0 && !keys.repeating(),"Opposing brightness keys cannot fight each other");
+    keys.clear();keys.timing(0,0);
+    check(keys.update(1,4000)==1 && keys.repeat(4249)==0 && keys.repeat(4250)==1 && keys.repeat(4279)==0,"Repeat timing is bounded against invalid system values");
+    keys.clear();check(!keys.repeating() && keys.repeat(99999)==0,"Disable, disconnect and session reset cancel held keys");
     const auto identity = identityColor();
     check(sameColor(dimColor(identity, 0, false), identity), "Zero opacity must preserve the existing color matrix");
     const auto half = dimColor(identity, 128, false);

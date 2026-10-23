@@ -1,6 +1,6 @@
 # Privacy policy — Screen Dimmer by Shardapps
 
-Updated for the v1.1.0 alpha. Applies to the current source and alpha releases in this repository.
+Updated for the v1.2.0 beta. Applies to the current source and preview releases in this repository.
 
 Screen does not collect, transmit, sell, or share personal data. It has no account system, telemetry, advertising, analytics SDK, network client, screenshot capture, or keystroke recording.
 
@@ -11,6 +11,8 @@ Screen saves brightness, per-display brightness overrides, selected display, the
 The app reads display geometry to position overlays and receives Windows display/session and window-change notifications. It inspects local window handles, process IDs, bounds, visibility and stacking order to maintain coverage; it does not read or log other apps' titles or contents. It registers the documented global shortcuts without installing a keyboard hook or injecting code into other apps. This state is processed locally.
 
 When desktop profiles or their settings need detection, Screen reads local Windows virtual desktop IDs and names to identify Task View workspaces. Optional brightness profiles and monitor overrides are saved by desktop ID in the same local settings file. Desktop names are used locally to label controls. No desktop metadata is transmitted or submitted automatically.
+
+Optional keyboard brightness control is off by default. When enabled, or during an explicit 15-second compatibility test, Screen registers for the HID Consumer Control collection through Windows Raw Input. It filters for display-brightness up/down usages and retains only their pressed/released state for bounded key repeat. Other consumer-control events are ignored; ordinary typing input is not registered, recorded or saved. The test does not change Screen's brightness. Windows or device firmware may independently change hardware brightness. The listener and its cached report metadata are released when the feature is disabled and testing ends. The local settings file stores the opt-in and the separate mini-panel feedback preference, not a key history or hardware identifiers.
 
 Close Screen and delete its settings file to reset or remove preferences. Removing a portable executable does not automatically remove its settings. Packaged uninstallation follows Windows' app-data handling.
 

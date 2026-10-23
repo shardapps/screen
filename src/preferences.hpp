@@ -7,7 +7,7 @@
 
 namespace screen {
 enum class PreferenceAction { display, brightness, theme, warm, smooth, resume, step, shortcut,
-    startup, pause, timedPause, restore, desktopProfiles, desktopBrightness, resetDesktop };
+    startup, pause, timedPause, restore, desktopProfiles, desktopBrightness, resetDesktop, brightnessKeys, testBrightnessKeys, brightnessKeyFeedback };
 class PreferencesWindow {
 public:
     PreferencesWindow(Settings& settings, std::vector<Monitor>& displays, std::wstring& selected,
@@ -16,6 +16,7 @@ public:
     void show(HWND owner);
     void refresh(bool rebuildDisplays = false);
     void startupState(StartupState state, bool busy);
+    void brightnessKeyStatus(const std::wstring& text,bool testing);
     HWND window() const { return window_; }
     bool message(MSG& message);
     void close();
