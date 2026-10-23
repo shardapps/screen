@@ -112,7 +112,7 @@ void PreferencesWindow::createControls() {
         SendMessageW(shortcut,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(value));
     label(L"Checking startup registration…",2,24,532,472,48,startupStatusId);
     add(L"BUTTON",L"Windows startup settings",button,systemStartupId,2,24,590,272,36);
-    label(L"Emergency restore: Ctrl + Alt + Shift + F12",2,24,644,472,24);
+    label(L"Emergency restore: Ctrl + Alt + Shift + F12",2,24,632,472,24);
 
     add(L"BUTTON",L"Different brightness for each Windows desktop",BS_AUTOCHECKBOX | WS_TABSTOP,desktopsEnabledId,3,24,156,472,38);
     label(L"Desktop detection unavailable",3,24,206,472,44,currentDesktopId);
@@ -183,7 +183,7 @@ void PreferencesWindow::layout() {
     layingOut_ = true;
     RECT client{}; GetClientRect(window_,&client);
     const auto height = MulDiv(client.bottom,96,static_cast<int>(dpi_));
-    const int content = page_==0?674:page_==2?692:page_==4?638:604;
+    const int content = page_==0?662:page_==2?668:page_==4?638:604;
     scroll_ = std::clamp(scroll_,0,std::max(0,content-height));
     SCROLLINFO info{sizeof(info),SIF_RANGE | SIF_PAGE | SIF_POS,0,content-1,static_cast<UINT>(std::max(1,height)),scroll_,0};
     SetScrollInfo(window_,SB_VERT,&info,TRUE); GetClientRect(window_,&client);
