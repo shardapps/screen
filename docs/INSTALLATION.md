@@ -2,9 +2,9 @@
 
 ## Normal setup
 
-Download the `Screen-preview-x64` CI artifact for Intel/AMD Windows, or `Screen-preview-arm64` for Windows on Arm. Extract it and open `Screen-Setup-0.4.0-x64.exe` or its ARM64 equivalent.
+Use the [Microsoft Store](https://apps.microsoft.com/detail/9PNHDHKMHDLG), or download `Screen-Setup-1.3.1-x64.exe` / `Screen-Setup-1.3.1-arm64.exe` from the [public beta release](https://github.com/shardapps/screen/releases/tag/v1.3.1-beta.1). Store updates require certification and rollout; GitHub setup builds are unsigned.
 
-Setup installs under `%LOCALAPPDATA%\Programs\Shardapps\Screen`, creates **Shardapps → Screen by Shardapps** in the Start menu, and registers a per-user uninstall entry. A desktop shortcut is optional. It needs no administrator rights and does not add certificates or change trust settings. Close Screen using its tray menu before reinstalling, upgrading, or uninstalling it.
+Setup installs under `%LOCALAPPDATA%\Programs\Shardapps\Screen`, creates **Shardapps â†’ Screen Dimmer by Shardapps** in the Start menu, and registers a per-user uninstall entry. A desktop shortcut is optional. It needs no administrator rights and does not add certificates or change trust settings. Close Screen using its tray menu before reinstalling, upgrading, or uninstalling it.
 
 This remains an unsigned developer preview. Windows may show SmartScreen or unknown-publisher warnings. If Windows or an organization's application-control policy blocks unsigned executables, use the organization's approved process or wait for a signed/Store distribution. Setup does not bypass those policies.
 
@@ -22,7 +22,7 @@ Normal MSIX installation needs a valid package signature trusted by Windows. Mic
 
 ## Uninstall and preferences
 
-For a setup installation, quit Screen, then use **Windows Settings → Apps → Installed apps → Screen by Shardapps → Uninstall**. Portable users can quit and delete their extracted folder.
+For a setup installation, quit Screen, then use **Windows Settings â†’ Apps â†’ Installed apps â†’ Screen Dimmer by Shardapps â†’ Uninstall**. Portable users can quit and delete their extracted folder.
 
 Both preserve preferences at `%LOCALAPPDATA%\Shardapps\Screen\settings.ini`. Delete that file with Screen closed if you also want to remove preferences. Setup does not enable automatic startup or change hardware brightness.
 

@@ -1,0 +1,65 @@
+[
+  {
+    "file": "01-slider.png",
+    "width": 1672,
+    "height": 941,
+    "bytes": 1448973,
+    "sha256": "ecbba6c983cc5f753af63b85a35baff8d27cc9389fff2671ae14ff6952b450d6"
+  },
+  {
+    "file": "02-themes.png",
+    "width": 1672,
+    "height": 941,
+    "bytes": 1455642,
+    "sha256": "50e80d4c7090175a61cd48dd0591f4e631d46ccf67b6b9149fa90b866e853a63"
+  },
+  {
+    "file": "03-displays.png",
+    "width": 1440,
+    "height": 1040,
+    "bytes": 46648,
+    "sha256": "1507364b4f212c95b3e9c46464ccdfef7e95fe071563a1e9f5e23efe08774af2"
+  },
+  {
+    "file": "04-appearance.png",
+    "width": 1440,
+    "height": 1040,
+    "bytes": 43446,
+    "sha256": "c4eaee95ce566751ed0ce41c0c18641c3904c96431957cca3d327f964fd5d493"
+  },
+  {
+    "file": "05-preferences.png",
+    "width": 1440,
+    "height": 1040,
+    "bytes": 45685,
+    "sha256": "ce23ad1d55fa6aa2a2398290577e7c32fb4f8006db0a805415b8bc55431d2a88"
+  },
+  {
+    "file": "06-desktops.png",
+    "width": 1440,
+    "height": 1040,
+    "bytes": 45162,
+    "sha256": "d34df7c2d98176c2c794a1c0fafe2abfe9e03c6c57e96aa04f2e7227a931515f"
+  },
+  {
+    "file": "07-keyboard.png",
+    "width": 1440,
+    "height": 1040,
+    "bytes": 56063,
+    "sha256": "a7e3930c6515c836d55483c236fd7a262ddfeb1a4a5f55b4f68cace04d3b660c"
+  },
+  {
+    "file": "brand-banner.png",
+    "width": 1672,
+    "height": 941,
+    "bytes": 1692380,
+    "sha256": "00264ea2a59baeb688239931e61997a904fed0b8f65695fd0258b9bc4bba38a8"
+  },
+  {
+    "file": "crescent-art.png",
+    "width": 1672,
+    "height": 941,
+    "bytes": 1595483,
+    "sha256": "a275c60069e11f28067e96990082979bfd310bcf1583f4189a20ccf35db34958"
+  }
+]
