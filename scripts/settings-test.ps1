@@ -16,6 +16,7 @@ public static class PreferencesTest {
  [DllImport("user32.dll",CharSet=CharSet.Unicode)]public static extern int GetClassName(IntPtr hwnd,StringBuilder text,int count);
  [DllImport("user32.dll")]public static extern bool EnumWindows(EnumProc callback,IntPtr data);
  [DllImport("user32.dll")]public static extern bool GetWindowRect(IntPtr hwnd,out Rect rect);
+ [DllImport("user32.dll",EntryPoint="GetWindowLongW")]public static extern int GetWindowLong(IntPtr hwnd,int index);
  [DllImport("user32.dll")]public static extern bool IsWindowVisible(IntPtr hwnd);
  [DllImport("user32.dll")]public static extern bool ShowWindow(IntPtr hwnd,int command);
  [DllImport("user32.dll")]public static extern bool IsWindow(IntPtr hwnd);
@@ -182,6 +183,7 @@ try{
  if([PreferencesTest]::SendMessage($display,0x0146,[IntPtr]::Zero,[IntPtr]::Zero).ToInt64() -lt 2){throw 'Display picker did not enumerate screens'}
  Assert-PickerFirstPaint
  Capture 'settings-displays.png'
+ if($StoreScreenshots -and ([PreferencesTest]::GetWindowLong($preferences,-16) -band 0x00200000)){throw 'Displays unnecessarily scrolls at the standard 150% capture size'}
  Send $display 0x014E 1;Send $preferences 0x0111 (1010 -bor (1 -shl 16)) $display
  Start-Sleep -Milliseconds 100
  if(-not (([PreferencesTest]::FileText($settingsFile) -split "`r?`n") -match '^selected=.+')){throw 'Selected screen did not persist'}
@@ -311,6 +313,7 @@ try{
  for($attempt=0;$attempt -lt 60 -and (Read-Run) -ne $expected;$attempt++){Start-Sleep -Milliseconds 50}
  if((Read-Run) -ne $expected){throw 'Startup registration did not quote the executable and use background arguments'}
  Capture 'settings-preferences.png'
+ if($StoreScreenshots -and ([PreferencesTest]::GetWindowLong($preferences,-16) -band 0x00200000)){throw 'Preferences unnecessarily scrolls at the standard 150% capture size'}
  Send $startup 0x00F5
  for($attempt=0;$attempt -lt 60 -and $null -ne (Read-Run);$attempt++){Start-Sleep -Milliseconds 50}
  if($null -ne (Read-Run)){throw 'Disabling startup did not remove registration'}

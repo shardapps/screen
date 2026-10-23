@@ -183,7 +183,7 @@ void PreferencesWindow::layout() {
     layingOut_ = true;
     RECT client{}; GetClientRect(window_,&client);
     const auto height = MulDiv(client.bottom,96,static_cast<int>(dpi_));
-    const int content = page_==0?662:page_==2?668:page_==4?638:604;
+    const int content = page_==0?662:page_==2?664:page_==4?638:604;
     scroll_ = std::clamp(scroll_,0,std::max(0,content-height));
     SCROLLINFO info{sizeof(info),SIF_RANGE | SIF_PAGE | SIF_POS,0,content-1,static_cast<UINT>(std::max(1,height)),scroll_,0};
     SetScrollInfo(window_,SB_VERT,&info,TRUE); GetClientRect(window_,&client);
