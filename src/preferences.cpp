@@ -82,7 +82,7 @@ void PreferencesWindow::createControls() {
     label(L"All displays uses desktop dimming for full-screen coverage. Different screen levels use compatibility overlays.",0,24,440,472,48,coverageId);
     add(L"BUTTON",L"Pause dimming",button,pauseId,0,24,502,228,40);
     add(L"BUTTON",L"Pause for 15 minutes",button,timerId,0,268,502,228,40);
-    label(L"Pause length",0,24,558,118,24);
+    label(L"Next pause",0,24,558,118,24);
     const auto pauseLength=add(WC_COMBOBOXW,L"Pause length",combo,pauseLengthId,0,148,552,120,180);
     for(const auto minutes:pauseLengths) { const auto text=std::to_wstring(minutes)+L" minutes";SendMessageW(pauseLength,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(text.c_str())); }
     label(L"Returns to your current level.",0,284,558,212,40,pauseStatusId);
@@ -338,7 +338,7 @@ void PreferencesWindow::command(int id,int notification) {
     if(id>=savePresetBase && id<savePresetBase+4) { action_(PreferenceAction::savePreset,id-savePresetBase);return; }
     if(id==savePresetId) {
         const auto menu=CreatePopupMenu();
-        for(int i=0;i<4;++i) { const auto text=L"Replace "+std::to_wstring(settings_.quickLevels[static_cast<size_t>(i)])+L"% preset";AppendMenuW(menu,MF_STRING,savePresetBase+i,text.c_str()); }
+        for(int i=0;i<4;++i) { const auto text=L"Slot "+std::to_wstring(i+1)+L" · replace "+std::to_wstring(settings_.quickLevels[static_cast<size_t>(i)])+L"%";AppendMenuW(menu,MF_STRING,savePresetBase+i,text.c_str()); }
         RECT rect{};GetWindowRect(GetDlgItem(window_,savePresetId),&rect);
         const auto choice=TrackPopupMenu(menu,TPM_RETURNCMD|TPM_LEFTALIGN,rect.left,rect.bottom,0,window_,nullptr);DestroyMenu(menu);
         if(choice) PostMessageW(window_,WM_COMMAND,choice,0);return;

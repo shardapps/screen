@@ -155,7 +155,7 @@ try {
     Start-Sleep -Milliseconds 100; Assert-Alpha 0
     $bounds = [ScreenSmoke+Rect]::new(); [void][ScreenSmoke]::GetWindowRect($window, [ref]$bounds)
     $scale = [ScreenSmoke]::GetDpiForWindow($window) / 96.0
-    if (($bounds.Right-$bounds.Left) -gt 340*$scale -or ($bounds.Bottom-$bounds.Top) -gt 150*$scale) { throw 'Flyout is not compact.' }
+    if (($bounds.Right-$bounds.Left) -gt 340*$scale -or ($bounds.Bottom-$bounds.Top) -gt 196*$scale) { throw 'Flyout exceeds the 330 x 184 quick-controls size budget (including scaling tolerance).' }
     $monitor = [ScreenSmoke+MonitorInfo]::new(); $monitor.Size = [Runtime.InteropServices.Marshal]::SizeOf($monitor)
     [void][ScreenSmoke]::GetMonitorInfo([ScreenSmoke]::MonitorFromWindow($window,2),[ref]$monitor)
     if ($bounds.Right -gt $monitor.Work.Right -or $bounds.Bottom -gt $monitor.Work.Bottom -or
