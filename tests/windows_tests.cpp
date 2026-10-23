@@ -12,8 +12,10 @@
 
 namespace {
 int notifications=0;
+int textUpdates=0;
 bool controlMotion=false;
 LRESULT CALLBACK procedure(HWND window,UINT message,WPARAM wp,LPARAM lp) {
+    if(message==WM_SETTEXT) ++textUpdates;
     if(message==screen::virtualDesktopsChanged) { ++notifications; return 0; }
     if(message==screen::ui::motionAllowed) return controlMotion;
     return DefWindowProcW(window,message,wp,lp);
@@ -165,6 +167,13 @@ int main(int argc,char** argv) {
     for(int i=0;i<20;++i) { WindowsBrightness follow;check(follow.start(window),"Repeated compatibility registration must succeed"); }
     GetProcessHandleCount(GetCurrentProcess(),&followAfter);
     check(followAfter<=followBefore+2 && !brightnessRegistration(),"Compatibility teardown must release resources without registering keyboard input");
+    const auto initialTextUpdates=textUpdates;
+    check(ui::setText(window,L"App brightness"),"Changed text updates the native control");
+    check(!ui::setText(window,L"App brightness") && textUpdates==initialTextUpdates+1,"Identical text avoids WM_SETTEXT and native layout work");
+    check(ui::setText(window,L"新しい明るさ") && !ui::setText(window,L"新しい明るさ"),"Unicode control text remains unchanged across refreshes");
+    const std::wstring longText(300,L'X');
+    check(ui::setText(window,longText) && !ui::setText(window,longText),"Long accessible labels use a safe comparison fallback");
+    check(ui::setText(window,L"") && !ui::setText(window,L"") && !ui::setText(nullptr,L"Ignored"),"Empty labels and absent controls are safe");
     DWORD userBefore=0,userAfter=0;
     for(int i=0;i<65;++i) {
         if(i==1) userBefore=GetGuiResources(GetCurrentProcess(),GR_USEROBJECTS);

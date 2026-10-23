@@ -234,22 +234,21 @@ struct App {
         if (!tracking && SendMessageW(slider, TBM_GETPOS, 0, 0) != brightness())
             SendMessageW(slider, TBM_SETPOS, TRUE, brightness());
         const auto percent = std::to_wstring(brightness()) + L"%";
-        SetWindowTextW(value, percent.c_str());
+        screen::ui::setText(value,percent);
         std::wstring displayName = L"All displays";
         for (size_t i = 0; i < displays.size(); ++i)
             if (displays[i].device == selected) displayName = L"Display " + std::to_wstring(i + 1);
         if (settings.separateDesktops && workspaces && !settings.activeDesktop.empty()) displayName = workspaces->name() + L" · " + displayName;
         const auto summary = timedPause?L"Paused · "+pauseClock():keyFeedback?L"Screen Dimmer · "+displayName:statusText.empty() ? (settings.paused ? L"Paused · " : L"") + displayName +
             (settings.paused ? L"" : desktopCoverage ? L" · Desktop" : L" · Overlay") : statusText;
-        SetWindowTextW(footer, summary.c_str());
+        screen::ui::setText(footer,summary);
         const auto mode=settings.windowsBrightness?L"Windows-linked":settings.brightnessKeys?L"Keyboard controls":L"Software dimming";
-        SetWindowTextW(shortcut,(std::wstring(mode)+L" · "+shortcutText).c_str());
-        SetWindowTextW(pinButton,settings.keepPanelOpen?L"Unpin mini panel":L"Keep mini panel open");
-        SetWindowTextW(pauseButton,settings.paused?L"Resume dimming":L"Pause dimming");
+        screen::ui::setText(shortcut,std::wstring(mode)+L" · "+shortcutText);
+        screen::ui::setText(pinButton,settings.keepPanelOpen?L"Unpin mini panel":L"Keep mini panel open");
+        screen::ui::setText(pauseButton,settings.paused?L"Resume dimming":L"Pause dimming");
         for(size_t i=0;i<quickButtons.size();++i) {
             const auto text=std::to_wstring(settings.quickLevels[i])+L"%";
-            if(GetWindowTextLengthW(quickButtons[i])!=static_cast<int>(text.size())) SetWindowTextW(quickButtons[i],text.c_str());
-            else {wchar_t old[16]{};GetWindowTextW(quickButtons[i],old,16);if(text!=old) SetWindowTextW(quickButtons[i],text.c_str());}
+            screen::ui::setText(quickButtons[i],text);
             InvalidateRect(quickButtons[i],nullptr,FALSE);
         }
         InvalidateRect(pinButton,nullptr,FALSE);InvalidateRect(pauseButton,nullptr,FALSE);
@@ -399,7 +398,7 @@ struct App {
     }
     void countdownTick() {
         countdownVisibility();
-        if(timedPause && IsWindowVisible(window)) SetWindowTextW(footer,(L"Paused · "+pauseClock()).c_str());
+        if(timedPause && IsWindowVisible(window)) screen::ui::setText(footer,L"Paused · "+pauseClock());
     }
     void cancelTimedPause() { KillTimer(window,20);KillTimer(window,34);countdownArmed=false;timedPause=false;pauseDeadline=0; }
     void pauseForMinutes() {

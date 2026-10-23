@@ -106,9 +106,11 @@ jobs:
           New-Item -ItemType Directory -Path dist -Force | Out-Null
           New-Item -ItemType Directory -Path $portable -Force | Out-Null
           Copy-Item build/${{ matrix.arch }}/Release/Screen.exe,LICENSE,README.md -Destination $portable
-          foreach ($item in @('docs','PRIVACY.md','SECURITY.md','CONTRIBUTING.md','CODE_OF_CONDUCT.md','CHANGELOG.md')) {
+          foreach ($item in @('PRIVACY.md','SECURITY.md','CONTRIBUTING.md','CODE_OF_CONDUCT.md','CHANGELOG.md')) {
             if (Test-Path -LiteralPath $item) { Copy-Item -LiteralPath $item -Destination $portable -Recurse }
           }
+          New-Item -ItemType Directory -Path "$portable/docs" -Force | Out-Null
+          Copy-Item docs/*.md -Destination "$portable/docs"
           Compress-Archive -Path "$portable/*" -DestinationPath dist/Screen-portable-${{ matrix.arch }}.zip
       - name: Build per-user setup EXE
         run: ./scripts/installer.ps1 -Architecture ${{ matrix.arch }} -Executable build/${{ matrix.arch }}/Release/Screen.exe
