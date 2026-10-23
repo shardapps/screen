@@ -2,8 +2,21 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstddef>
+#include <optional>
 
 namespace screen {
+// Notifications describe levels, not key presses. The initial snapshot never dims.
+class WindowsBrightnessState {
+public:
+    std::optional<unsigned> update(unsigned level) {
+        if(level>100) return {};
+        const auto previous=last_;last_=level;
+        return previous && *previous!=level?last_:std::nullopt;
+    }
+    void clear() { last_.reset(); }
+private:
+    std::optional<unsigned> last_;
+};
 inline bool validBrightnessReportBatch(std::size_t bytes,std::uint32_t length,std::uint32_t count) {
     return bytes<=65536 && length && length<=4096 && count && count<=64 && count<=bytes/length;
 }

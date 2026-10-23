@@ -39,6 +39,7 @@ Settings parseSettings(std::wistream& input) {
         else if (key == L"shortcut") result.openingShortcut = std::clamp(value, 0, 2);
         else if (key == L"resume") result.resumeOnLaunch = value == 1;
         else if (key == L"brightnessKeys") result.brightnessKeys = value == 1;
+        else if (key == L"windowsBrightness") result.windowsBrightness = value == 1;
         else if (key == L"brightnessKeyFeedback") result.brightnessKeyFeedback = value != 0;
         else if (key == L"separateDesktops") result.separateDesktops = value == 1;
         else if (key.starts_with(L"desktop:") && key.size() > 47) {
@@ -55,6 +56,7 @@ Settings parseSettings(std::wistream& input) {
         else if (key.starts_with(L"monitor:")) result.monitors[key.substr(8)] = clampBrightness(value);
     }
     result.paused = !result.resumeOnLaunch;
+    if(result.windowsBrightness) result.brightnessKeys=false; // Sources are mutually exclusive.
     return result;
 }
 void writeSettings(std::wostream& output, const Settings& settings) {
@@ -66,6 +68,7 @@ void writeSettings(std::wostream& output, const Settings& settings) {
                    << L"shortcut=" << settings.openingShortcut << L'\n'
                    << L"resume=" << settings.resumeOnLaunch << L'\n'
                    << L"brightnessKeys=" << settings.brightnessKeys << L'\n'
+                   << L"windowsBrightness=" << settings.windowsBrightness << L'\n'
                    << L"brightnessKeyFeedback=" << settings.brightnessKeyFeedback << L'\n'
                    << L"separateDesktops=" << settings.separateDesktops << L'\n'
                    << L"selected=" << settings.selectedDisplay << L'\n';

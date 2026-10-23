@@ -224,17 +224,33 @@ try{
  # Consumer brightness input is an explicit opt-in; testing never enables it.
  Send $preferences 0x0111 1004;Start-Sleep -Milliseconds 160
  $brightnessKeys=[PreferencesTest]::GetDlgItem($preferences,1400)
+ $windowsBrightness=[PreferencesTest]::GetDlgItem($preferences,1404)
  $keyFeedback=[PreferencesTest]::GetDlgItem($preferences,1403)
  $testKeys=[PreferencesTest]::GetDlgItem($preferences,1401)
  if([PreferencesTest]::SendMessage($brightnessKeys,0x00F0,[IntPtr]::Zero,[IntPtr]::Zero).ToInt32() -ne 0){throw 'Brightness keys must be off by default'}
+ if([PreferencesTest]::SendMessage($windowsBrightness,0x00F0,[IntPtr]::Zero,[IntPtr]::Zero).ToInt32() -ne 0){throw 'Windows brightness compatibility must be off by default'}
  if([PreferencesTest]::SendMessage($keyFeedback,0x00F0,[IntPtr]::Zero,[IntPtr]::Zero).ToInt32() -ne 1){throw 'Optional keyboard feedback should initially be on'}
  Send $testKeys 0x00F5
  if((Read-Text $testKeys) -ne 'Stop test'){throw 'Brightness-key test did not start'}
  if([PreferencesTest]::FileText($settingsFile) -notmatch 'brightness=100'){throw 'Key test changed brightness'}
  Send $window 0x0113 31 # Expire the same one-shot test handler without waiting 15 seconds.
- if((Read-Text $testKeys) -ne 'Test brightness keys'){throw 'Brightness-key test did not expire'}
+ if((Read-Text $testKeys) -ne 'Test brightness controls'){throw 'Brightness-key test did not expire'}
  if((Read-Text ([PreferencesTest]::GetDlgItem($preferences,1402))) -notmatch 'No brightness keys detected'){throw 'Missing compatibility result'}
  Send $brightnessKeys 0x00F5;Wait-SettingsFile 'brightnessKeys=1'
+ Send $windowsBrightness 0x00F5;Wait-SettingsFile 'windowsBrightness=1';Wait-SettingsFile 'brightnessKeys=0'
+ if([PreferencesTest]::SendMessage($brightnessKeys,0x00F0,[IntPtr]::Zero,[IntPtr]::Zero).ToInt32() -ne 0){throw 'Compatibility must uncheck native input'}
+ Start-Sleep -Milliseconds 180
+ if([PreferencesTest]::FileText($settingsFile) -notmatch 'brightness=100'){throw 'Enabling compatibility replaced saved brightness'}
+ Send $testKeys 0x00F5
+ if((Read-Text $testKeys) -ne 'Stop test'){throw 'Compatibility test did not start'}
+ Send $window 0x0113 31
+ if((Read-Text ([PreferencesTest]::GetDlgItem($preferences,1402))) -notmatch 'Compatibility on'){throw 'Compatibility status must describe Windows changes rather than certify physical keys'}
+ Capture 'settings-keyboard-compatibility.png'
+ Send $window 0x0312 4;Wait-SettingsFile 'windowsBrightness=0'
+ if([PreferencesTest]::SendMessage($windowsBrightness,0x00F0,[IntPtr]::Zero,[IntPtr]::Zero).ToInt32() -ne 0){throw 'Emergency restore must stop compatibility following'}
+ Send $windowsBrightness 0x00F5;Wait-SettingsFile 'windowsBrightness=1'
+ Send $brightnessKeys 0x00F5;Wait-SettingsFile 'brightnessKeys=1';Wait-SettingsFile 'windowsBrightness=0'
+ if([PreferencesTest]::SendMessage($windowsBrightness,0x00F0,[IntPtr]::Zero,[IntPtr]::Zero).ToInt32() -ne 0){throw 'Native input must uncheck compatibility'}
  Send $brightnessKeys 0x00F5;Wait-SettingsFile 'brightnessKeys=0'
  Capture 'settings-keyboard.png'
  # Fallback shortcuts exercise the same non-activating app-brightness panel.

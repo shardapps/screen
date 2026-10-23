@@ -41,6 +41,8 @@ struct App {
     std::unique_ptr<screen::PreferencesWindow> preferences;
     std::unique_ptr<screen::VirtualDesktops> workspaces;
     std::unique_ptr<screen::BrightnessKeys> brightnessKeys;
+    std::unique_ptr<screen::WindowsBrightness> windowsBrightness;
+    bool windowsChangeObserved=false;
     bool testingKeys=false,keysUnavailable=false,keyRepeatArmed=false,keyLevelDirty=false,keyFeedback=false;
     unsigned observedKeys=0;
     screen::StartupController startup;
@@ -55,7 +57,13 @@ struct App {
     void keyStatus() {
         if(!preferences) return;
         std::wstring text;
-        if(keysUnavailable) text=L"Brightness-key listening unavailable. Use Ctrl + Alt + Up / Down.";
+        if(settings.windowsBrightness) {
+            text=keysUnavailable?L"Windows brightness notifications unavailable. Use Ctrl + Alt + Up / Down.":
+                windowsChangeObserved?(testingKeys?L"Windows brightness changes detected. Test mode leaves app brightness unchanged.":L"Windows brightness changes detected. Compatibility is on."):
+                testingKeys?L"Listening for 15 seconds. Change Windows brightness using your sun keys or Windows slider.":L"Compatibility on. Saved dimming stays until Windows reports a new level.";
+            preferences->brightnessKeyStatus(text,testingKeys);return;
+        }
+        if(keysUnavailable) text=L"Brightness-key listening unavailable. Try compatibility mode or Ctrl + Alt + Up / Down.";
         else if(testingKeys) text=observedKeys==3?L"Both brightness keys detected. Test mode does not change Screen's brightness.":
             observedKeys==1?L"Brightness up detected. Press brightness down to finish the check.":
             observedKeys==2?L"Brightness down detected. Press brightness up to finish the check.":
@@ -73,8 +81,15 @@ struct App {
         if(!keysUnavailable) brightnessKeys=std::move(listener);
         return !keysUnavailable;
     }
+    bool listenForWindowsBrightness() {
+        if(windowsBrightness) return true;
+        auto listener=std::make_unique<screen::WindowsBrightness>();
+        keysUnavailable=!listener->start(window);
+        if(!keysUnavailable) windowsBrightness=std::move(listener);
+        return !keysUnavailable;
+    }
     void clearHeldKeys() {
-        KillTimer(window,30);keyRepeatArmed=false;
+        KillTimer(window,30);KillTimer(window,33);keyRepeatArmed=false;
         if(brightnessKeys) brightnessKeys->clear();
         if(keyLevelDirty && engine) engine->submit(settings,true);
         keyLevelDirty=false;
@@ -82,12 +97,13 @@ struct App {
     void stopKeyTest() {
         KillTimer(window,31); testingKeys=false;clearHeldKeys();
         if(!settings.brightnessKeys) brightnessKeys.reset();
+        if(!settings.windowsBrightness) windowsBrightness.reset();
         keyStatus();
     }
     void testKeys() {
         if(testingKeys) { stopKeyTest();return; }
-        observedKeys=0;
-        if(listenForKeys()) {
+        observedKeys=0;windowsChangeObserved=false;
+        if(settings.windowsBrightness?listenForWindowsBrightness():listenForKeys()) {
             clearHeldKeys();testingKeys=SetTimer(window,31,15000,nullptr)!=0;
             if(!testingKeys) {
                 if(!settings.brightnessKeys) brightnessKeys.reset();
@@ -96,6 +112,17 @@ struct App {
             }
         }
         keyStatus();
+    }
+    void windowsBrightnessInput(const POWERBROADCAST_SETTING& notification) {
+        if(!windowsBrightness) return;
+        const auto level=windowsBrightness->input(notification);
+        if(!level) return;
+        windowsChangeObserved=true;keyStatus();
+        if(testingKeys || !settings.windowsBrightness || timedPause) return;
+        refreshWorkspace();
+        setBrightness(static_cast<int>(*level));apply(false);keyLevelDirty=true;
+        showKeyFeedback();
+        if(!SetTimer(window,33,300,nullptr)) clearHeldKeys();
     }
     void keyAdjustment(int direction) {
         if(!direction || testingKeys || !settings.brightnessKeys) return;
@@ -318,7 +345,9 @@ struct App {
         else { statusText = L"Tray unavailable"; sync(); }
     }
     void restore() {
+        stopKeyTest();
         clearHeldKeys();
+        settings.windowsBrightness=false;windowsBrightness.reset();windowsChangeObserved=false;keyStatus();
         cancelTimedPause();
         settings.paused = true; settings.setAll(100); statusText.clear(); apply(true, true);
     }
@@ -371,10 +400,18 @@ struct App {
         case smooth: settings.smooth = amount != 0; break;
         case resume: settings.resumeOnLaunch = amount != 0; break;
         case brightnessKeys:
-            clearHeldKeys();settings.brightnessKeys=amount!=0;
+            stopKeyTest();clearHeldKeys();settings.brightnessKeys=amount!=0;
+            if(settings.brightnessKeys) { settings.windowsBrightness=false;this->windowsBrightness.reset(); }
             if(settings.brightnessKeys && !listenForKeys()) settings.brightnessKeys=false;
             if(!settings.brightnessKeys && !testingKeys) this->brightnessKeys.reset();
             if(!settings.brightnessKeys && keyFeedback) hide();
+            keyStatus();break;
+        case windowsBrightness:
+            stopKeyTest();clearHeldKeys();settings.windowsBrightness=amount!=0;
+            if(settings.windowsBrightness) {
+                settings.brightnessKeys=false;this->brightnessKeys.reset();windowsChangeObserved=false;
+                if(!listenForWindowsBrightness()) settings.windowsBrightness=false;
+            } else this->windowsBrightness.reset();
             keyStatus();break;
         case brightnessKeyFeedback:
             settings.brightnessKeyFeedback=amount!=0;
@@ -518,6 +555,7 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
         if (!app->engine->healthy()) return -1;
         app->engine->submit(app->settings, false, true); app->addTray();
         if(app->settings.brightnessKeys && !app->listenForKeys()) app->settings.brightnessKeys=false;
+        if(app->settings.windowsBrightness && !app->listenForWindowsBrightness()) app->settings.windowsBrightness=false;
         constexpr UINT mods = MOD_CONTROL | MOD_ALT | MOD_NOREPEAT;
         RegisterHotKey(window, 1, mods, 'D'); RegisterHotKey(window, 2, mods, VK_DOWN);
         RegisterHotKey(window, 3, mods, VK_UP);
@@ -589,9 +627,12 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
         }
         return 0;
     case WM_WTSSESSION_CHANGE:
+        if(app->windowsBrightness) app->windowsBrightness->session(wParam);
         if(wParam==WTS_SESSION_LOCK || wParam==WTS_CONSOLE_DISCONNECT || wParam==WTS_REMOTE_DISCONNECT) { app->clearHeldKeys();if(app->keyFeedback) app->hide(); }
         return 0;
     case WM_POWERBROADCAST:
+        if(app->windowsBrightness) app->windowsBrightness->power(wParam);
+        if(wParam==PBT_POWERSETTINGCHANGE && lParam) app->windowsBrightnessInput(*reinterpret_cast<const POWERBROADCAST_SETTING*>(lParam));
         if(wParam==PBT_APMSUSPEND) { app->clearHeldKeys();if(app->keyFeedback) app->hide(); }
         return TRUE;
     case WM_CONTEXTMENU: app->menu(); return 0;
@@ -610,8 +651,9 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
             if(!app->brightnessKeys->repeating()) app->clearHeldKeys();
         } else if(wParam==31) {
             const auto observed=app->observedKeys;app->stopKeyTest();
-            if(!observed && app->preferences) app->preferences->brightnessKeyStatus(L"No brightness keys detected. Try Fn + the sun keys, or use Ctrl + Alt + Up / Down.",false);
-        } else if(wParam==32) {
+            if(!observed && !app->settings.windowsBrightness && app->preferences) app->preferences->brightnessKeyStatus(L"No brightness keys detected. Try compatibility mode for Windows brightness changes, or Ctrl + Alt + Up / Down.",false);
+        } else if(wParam==33) { app->clearHeldKeys(); }
+        else if(wParam==32) {
             if(!app->keyFeedback) { KillTimer(window,32);return 0; }
             POINT pointer{};GetCursorPos(&pointer);const auto target=WindowFromPoint(pointer);
             if(GetForegroundWindow()==window || GetCapture()==app->slider) app->adoptKeyFeedback();
@@ -646,7 +688,7 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
     case WM_QUERYENDSESSION: return TRUE;
     case WM_ENDSESSION: if (wParam) DestroyWindow(window); return 0;
     case WM_DESTROY: {
-        app->stopKeyTest();app->brightnessKeys.reset();
+        app->stopKeyTest();app->brightnessKeys.reset();app->windowsBrightness.reset();
         KillTimer(window, 10);app->panelFrame.cancel(); app->cancelTimedPause(); app->preferences.reset(); app->engine.reset(); app->workspaces.reset();
         NOTIFYICONDATAW data{sizeof(data)}; data.hWnd = window; data.uID = 1; Shell_NotifyIconW(NIM_DELETE, &data);
         for (int id = 1; id <= 5; ++id) UnregisterHotKey(window, id);

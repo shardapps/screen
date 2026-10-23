@@ -8,6 +8,8 @@ The artifact `Screen-performance-comparison` contains raw samples, median/range 
 
 The beta adds a fourth paused mode with brightness-key listening explicitly enabled. Compare it with ordinary shared mode to assess the optional HID parser/registration cost; the off state does not create that listener. Held-key repeat and mini-panel feedback are inactive during these idle measurements. Real key delivery and active input/rendering costs remain separate acceptance cases.
 
+The compatibility fix adds a fifth paused mode with Windows brightness notifications enabled. It uses the existing UI thread, has no WMI observer or idle polling timer, and receives an initial baseline without applying dimming. The same 20% private-memory and 50 ms idle CPU investigation budgets apply. Physical notifications, active dimming and the mini panel were checked separately with a user; a successful check on one machine does not establish universal compatibility.
+
 Frame timers are created lazily and armed only during brightness or flyout motion. One-shot scheduling follows the reported desktop composition rate, capped at 144 Hz, without changing the global timer resolution. A native window timer remains the fallback. The portable smoothing model retains velocity through rapid retargets; all frame timers stop when settled or motion is disabled.
 
 ### Alpha 2 comparison result

@@ -1,6 +1,6 @@
 # Privacy policy — Screen Dimmer by Shardapps
 
-Updated for the v1.2.0 beta. Applies to the current source and preview releases in this repository.
+Updated for the v1.2.1 compatibility fix under testing. Applies to the current source and preview releases in this repository.
 
 Screen does not collect, transmit, sell, or share personal data. It has no account system, telemetry, advertising, analytics SDK, network client, screenshot capture, or keystroke recording.
 
@@ -15,6 +15,8 @@ When desktop profiles or their settings need detection, Screen reads local Windo
 Optional keyboard brightness control is off by default. When enabled, or during an explicit 15-second compatibility test, Screen registers for the HID Consumer Control collection through Windows Raw Input. It filters for display-brightness up/down usages and retains only their pressed/released state for bounded key repeat. Other consumer-control events are ignored; ordinary typing input is not registered, recorded or saved. The test does not change Screen's brightness. Windows or device firmware may independently change hardware brightness. The listener and its cached report metadata are released when the feature is disabled and testing ends. The local settings file stores the opt-in and the separate mini-panel feedback preference, not a key history or hardware identifiers.
 
 Close Screen and delete its settings file to reset or remove preferences. Removing a portable executable does not automatically remove its settings. Packaged uninstallation follows Windows' app-data handling.
+
+The separate **Follow Windows brightness (compatibility)** option is off by default. It receives the Windows logical brightness percentage on the existing app thread. Notifications do not identify whether the change came from sun keys, the Windows slider or automatic brightness. Screen stores the option and the resulting app brightness, not a brightness-event history. It does not write a hardware brightness value, subscribe to WMI or install a keyboard hook. Native HID input is disabled while compatibility following is selected.
 
 ## Third-party services and reports
 

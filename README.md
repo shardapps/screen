@@ -24,7 +24,7 @@ Screen by **Shardapps** dims Windows desktop output using a full-desktop color t
 
 **Next update: Alpha 2 (v1.1.0).** Adds Windows virtual desktop profiles, fixes the blank display picker, refines all themes and improves animation pacing. Store publication is pending; [build artifacts](https://github.com/shardapps/screen/actions/workflows/ci.yml) contain developer previews.
 
-**Beta preview: v1.2.0.** Adds optional keyboard sun-key control and a brief, non-activating mini panel labeled **App brightness**, with a separate feedback switch. Start with **Settings → Keyboard → Test brightness keys**; native key control is off by default. OEM Fn keys vary and normal hardware brightness may also change. [Compatibility and setup](docs/BRIGHTNESS_KEYS.md) · [Preview downloads](https://github.com/shardapps/screen/releases).
+**Keyboard-controls beta:** the v1.2.0 preview was withdrawn after a physical-key compatibility failure. Current source adds a separate **Follow Windows brightness (compatibility)** option for systems where Windows reports level changes without delivering native HID keys. Both input modes are off by default; mini-panel feedback is independent and explicitly labeled **App brightness**. Compatibility also follows Windows-slider and automatic changes. Replacement packages have not been published. [Compatibility and setup](docs/BRIGHTNESS_KEYS.md).
 
 ## Built to stay out of your way
 
