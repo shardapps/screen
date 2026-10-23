@@ -131,8 +131,8 @@ BrightnessKeyEvent BrightnessKeys::input(HRAWINPUT input,std::uint64_t now) {
     }
     return result;
 }
-int BrightnessKeys::repeat(std::uint64_t now) { return impl_->state.repeat(now); }
-bool BrightnessKeys::repeating() const { return impl_->state.repeating(); }
+int BrightnessKeys::repeat(std::uint64_t now) { return impl_->session?impl_->state.repeat(now):0; }
+bool BrightnessKeys::repeating() const { return impl_->session && impl_->state.repeating(); }
 void BrightnessKeys::clear() { impl_->clear(); }
 void BrightnessKeys::removed(HANDLE device) { impl_->devices.erase(device);impl_->clear(); }
 unsigned BrightnessKeys::supportedDevices() {

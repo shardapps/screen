@@ -89,13 +89,16 @@ struct App {
         observedKeys=0;
         if(listenForKeys()) {
             clearHeldKeys();testingKeys=SetTimer(window,31,15000,nullptr)!=0;
-            if(!testingKeys && !settings.brightnessKeys) brightnessKeys.reset();
+            if(!testingKeys) {
+                if(!settings.brightnessKeys) brightnessKeys.reset();
+                if(preferences) preferences->brightnessKeyStatus(L"The test timer could not start. Try again.",false);
+                return;
+            }
         }
         keyStatus();
     }
     void keyAdjustment(int direction) {
         if(!direction || testingKeys || !settings.brightnessKeys) return;
-        refreshWorkspace();
         setBrightness(brightness()+direction*settings.adjustmentStep);apply(false);keyLevelDirty=true;
         showKeyFeedback();
     }
@@ -103,6 +106,7 @@ struct App {
         if(!brightnessKeys) return;
         const auto event=brightnessKeys->input(input,GetTickCount64());
         if(event.observed) { observedKeys|=event.observed;keyStatus(); }
+        if(event.direction) refreshWorkspace(); // Once per physical press; repeat never polls the shell.
         keyAdjustment(event.direction);
         if(!testingKeys && brightnessKeys->repeating()) {
             if(!keyRepeatArmed) {
