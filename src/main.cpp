@@ -303,7 +303,9 @@ struct App {
         if(!keyFeedback || !IsWindowVisible(window)) {
             keyFeedback=true;place();
             if(!IsWindowVisible(window)) { panelAlpha=0;SetLayeredWindowAttributes(window,0,0,LWA_ALPHA); }
-            ShowWindow(window,SW_SHOWNOACTIVATE);sync();
+            // A quiet startup can carry STARTUPINFO's hidden-window override.
+            // Explicit show-without-activation also works for the first feedback.
+            SetWindowPos(window,HWND_TOPMOST,0,0,0,0,SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);sync();
         }
         if(panelAlpha<255 && (!animating || !opening)) animate(true);
         if(!SetTimer(window,32,2000,nullptr)) hide();
