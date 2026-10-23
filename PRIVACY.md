@@ -1,6 +1,6 @@
 # Privacy policy — Screen Dimmer by Shardapps
 
-Updated for the v1.2.1 compatibility fix under testing. Applies to the current source and preview releases in this repository.
+Updated for the v1.3.0 beta polish under testing. Applies to the current source and preview releases in this repository.
 
 Screen does not collect, transmit, sell, or share personal data. It has no account system, telemetry, advertising, analytics SDK, network client, screenshot capture, or keystroke recording.
 
@@ -17,6 +17,8 @@ Optional keyboard brightness control is off by default. When enabled, or during 
 Close Screen and delete its settings file to reset or remove preferences. Removing a portable executable does not automatically remove its settings. Packaged uninstallation follows Windows' app-data handling.
 
 The separate **Follow Windows brightness (compatibility)** option is off by default. It receives the Windows logical brightness percentage on the existing app thread. Notifications do not identify whether the change came from sun keys, the Windows slider or automatic brightness. Screen stores the option and the resulting app brightness, not a brightness-event history. It does not write a hardware brightness value, subscribe to WMI or install a keyboard hook. Native HID input is disabled while compatibility following is selected.
+
+The four quick brightness values, preferred pause length and manual-panel pin preference are stored in the same local settings file. An active pause deadline is held only in memory and is not a schedule/history. Hover/focus animation state is temporary and released with its native control. These features add no data transmission, background polling service or external account.
 
 ## Third-party services and reports
 

@@ -41,6 +41,10 @@ Settings parseSettings(std::wistream& input) {
         else if (key == L"brightnessKeys") result.brightnessKeys = value == 1;
         else if (key == L"windowsBrightness") result.windowsBrightness = value == 1;
         else if (key == L"brightnessKeyFeedback") result.brightnessKeyFeedback = value != 0;
+        else if(key==L"pauseMinutes") result.pauseMinutes=validPauseMinutes(value);
+        else if(key==L"keepPanelOpen") result.keepPanelOpen=value==1;
+        else if(key.size()==6 && key.starts_with(L"quick") && key[5]>=L'0' && key[5]<=L'3')
+            result.quickLevels[static_cast<size_t>(key[5]-L'0')]=clampBrightness(value);
         else if (key == L"separateDesktops") result.separateDesktops = value == 1;
         else if (key.starts_with(L"desktop:") && key.size() > 47) {
             const auto id = key.substr(8,38);
@@ -70,8 +74,11 @@ void writeSettings(std::wostream& output, const Settings& settings) {
                    << L"brightnessKeys=" << settings.brightnessKeys << L'\n'
                    << L"windowsBrightness=" << settings.windowsBrightness << L'\n'
                    << L"brightnessKeyFeedback=" << settings.brightnessKeyFeedback << L'\n'
+                   << L"pauseMinutes=" << settings.pauseMinutes << L'\n'
+                   << L"keepPanelOpen=" << settings.keepPanelOpen << L'\n'
                    << L"separateDesktops=" << settings.separateDesktops << L'\n'
                    << L"selected=" << settings.selectedDisplay << L'\n';
+            for(size_t i=0;i<settings.quickLevels.size();++i) output<<L"quick"<<i<<L'='<<settings.quickLevels[i]<<L'\n';
             for (const auto& [device, value] : settings.monitors)
                 output << L"monitor:" << device << L'=' << value << L'\n';
             for (const auto& [id, profile] : settings.desktops) {

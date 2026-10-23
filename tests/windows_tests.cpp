@@ -2,6 +2,7 @@
 #include "virtual_desktops.hpp"
 #include "frame_timer.hpp"
 #include "brightness_keys.hpp"
+#include "ui.hpp"
 #include <sstream>
 #include <iostream>
 #include <string_view>
@@ -11,8 +12,10 @@
 
 namespace {
 int notifications=0;
+bool controlMotion=false;
 LRESULT CALLBACK procedure(HWND window,UINT message,WPARAM wp,LPARAM lp) {
     if(message==screen::virtualDesktopsChanged) { ++notifications; return 0; }
+    if(message==screen::ui::motionAllowed) return controlMotion;
     return DefWindowProcW(window,message,wp,lp);
 }
 void pump() {
@@ -55,6 +58,14 @@ int main(int argc,char** argv) {
     check(parseSettings(followText).windowsBrightness,"Windows brightness compatibility survives a settings round trip");
     std::wistringstream invalidFollow(L"windowsBrightness=2\n");
     check(!parseSettings(invalidFollow).windowsBrightness,"Only explicit value 1 enables Windows brightness following");
+    std::wistringstream comfort(L"quick0=1\nquick1=43\nquick2=1000\nquick3=90\nquick4=50\npauseMinutes=30\nkeepPanelOpen=1\n");
+    auto comfortSaved=parseSettings(comfort);
+    check(comfortSaved.quickLevels==std::array<int,4>{8,43,100,90} && comfortSaved.pauseMinutes==30 && comfortSaved.keepPanelOpen,"Custom quick levels clamp safely and comfort preferences load");
+    std::wstringstream comfortText;writeSettings(comfortText,comfortSaved);auto comfortLoaded=parseSettings(comfortText);
+    check(comfortLoaded.quickLevels==comfortSaved.quickLevels && comfortLoaded.pauseMinutes==30 && comfortLoaded.keepPanelOpen,"Comfort preferences survive restart");
+    std::wistringstream corruptComfort(L"pauseMinutes=999\nkeepPanelOpen=2\nquick9=1\n");
+    const auto safeComfort=parseSettings(corruptComfort);
+    check(safeComfort.pauseMinutes==15 && !safeComfort.keepPanelOpen && safeComfort.quickLevels[0]==25,"Malformed comfort preferences retain safe defaults");
     check(!loaded.paused && loaded.separateDesktops && loaded.activeDesktop.empty(),"Persist options but never persist stale active desktop context");
     loaded.activeDesktop=a;
     check(loaded.currentBrightness()==18 && loaded.forMonitor(L"DISPLAY-A")==18,"Round-trip must preserve a cleared profile override map");
@@ -154,6 +165,20 @@ int main(int argc,char** argv) {
     for(int i=0;i<20;++i) { WindowsBrightness follow;check(follow.start(window),"Repeated compatibility registration must succeed"); }
     GetProcessHandleCount(GetCurrentProcess(),&followAfter);
     check(followAfter<=followBefore+2 && !brightnessRegistration(),"Compatibility teardown must release resources without registering keyboard input");
+    DWORD userBefore=0,userAfter=0;
+    for(int i=0;i<65;++i) {
+        if(i==1) userBefore=GetGuiResources(GetCurrentProcess(),GR_USEROBJECTS);
+        const auto child=CreateWindowW(L"BUTTON",L"Motion fixture",WS_CHILD|WS_VISIBLE,0,0,100,30,window,nullptr,cls.hInstance,nullptr);
+        SetWindowSubclass(child,ui::buttonProcedure,1,0);
+        SendMessageW(child,WM_MOUSEMOVE,0,0);
+        check(ui::interactionAmount(child)==1,"Reduced-motion controls respond without waiting for animation");
+        SendMessageW(child,WM_MOUSELEAVE,0,0);
+        check(ui::interactionAmount(child)==0,"Reduced-motion leave settles immediately");
+        controlMotion=true;SendMessageW(child,WM_MOUSEMOVE,0,0);controlMotion=false;
+        DestroyWindow(child); // Also exercises destruction with a pending animation timer.
+    }
+    userAfter=GetGuiResources(GetCurrentProcess(),GR_USEROBJECTS);
+    check(userAfter<=userBefore+1,"Repeated interactive controls must release subclasses and timer resources");
     DestroyWindow(window);RegCloseKey(root);RegDeleteTreeW(HKEY_CURRENT_USER,path.c_str());
     pump();
     {

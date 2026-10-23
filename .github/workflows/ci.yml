@@ -46,12 +46,12 @@ jobs:
       - name: Check native Windows behavior
         if: matrix.arch == 'x64'
         run: ./scripts/smoke-test.ps1 -Executable build/x64/Release/Screen.exe
-      - name: Compare native tray memory with the Store alpha
+      - name: Compare native tray memory with the compatibility baseline
         if: matrix.arch == 'x64'
         run: |
-          git fetch --no-tags --depth 1 origin 0a4ecf9c593799e7cc8cc455bde4e65c9e2230d5
+          git fetch --no-tags --depth 1 origin 9e5f74bd0fe8fba7bf7f9b3a65b0dcee7ebac041
           if ($LASTEXITCODE -ne 0) { throw 'Could not fetch the pinned comparison source.' }
-          git archive --format zip --output build/performance-baseline.zip 0a4ecf9c593799e7cc8cc455bde4e65c9e2230d5
+          git archive --format zip --output build/performance-baseline.zip 9e5f74bd0fe8fba7bf7f9b3a65b0dcee7ebac041
           if ($LASTEXITCODE -ne 0) { throw 'Could not archive the comparison source.' }
           Expand-Archive build/performance-baseline.zip -DestinationPath build/performance-baseline-src
           ./build/performance-baseline-src/scripts/configure.ps1 -Architecture x64 -BuildDirectory build/performance-baseline

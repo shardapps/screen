@@ -51,7 +51,7 @@ At zero opacity the compatibility surface is hidden and the desktop color runtim
 
 ## Compact controls
 
-The UI is a 330 × 136 DPI-scaled tool window, anchored inside the work area of the tray icon's monitor (cursor monitor fallback). It stays above the bottom-right taskbar, without an Alt+Tab/taskbar entry. Alt+S opens/hides it; Ctrl+Alt+S is the fallback when reserved. Native slider keyboard/MSAA/UIA behavior is preserved while custom drawing supplies a quiet rounded track. The footer opens display selection and the settings icon opens an on-demand native settings window. Context/tray controls remain available.
+The UI is a 330 × 184 DPI-scaled tool window, anchored inside the work area of the tray icon's monitor (cursor monitor fallback). It stays above the bottom-right taskbar, without an Alt+Tab/taskbar entry. Alt+S opens/hides it; Ctrl+Alt+S is the fallback when reserved. Native slider keyboard/MSAA/UIA behavior is preserved while custom drawing supplies a quiet rounded track. The footer opens display selection and the settings icon opens an on-demand native settings window. Context/tray controls remain available.
 
 The panel and settings share six named palettes plus System, with high-contrast priority. Opening takes about 160 ms with a small fade/slide; dismissal takes about 90 ms. The flyout uses the same one-shot frame scheduler on its existing UI thread. Timers run only during a transition. Escape or losing focus dismisses the panel, while dimming and tray access remain active.
 

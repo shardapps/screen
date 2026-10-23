@@ -49,8 +49,8 @@ function Median($values){$sorted=@($values | Sort-Object);$n=$sorted.Count;if($n
 try{
  [void][IO.Directory]::CreateDirectory((Split-Path -Parent $settingsFile))
  # Interleave samples to reduce run-order bias on the same hosted machine.
- foreach($sample in 1..$Samples){Measure-Screen $BaselineExecutable 'baseline-shared' $false;Measure-Screen $Executable 'current-shared' $false;Measure-Screen $Executable 'current-profiles' $true;Measure-Screen $Executable 'current-brightness-keys' $false $true;Measure-Screen $Executable 'current-windows-brightness' $false $false $true}
- $summary=@(foreach($mode in @('baseline-shared','current-shared','current-profiles','current-brightness-keys','current-windows-brightness')){
+ foreach($sample in 1..$Samples){Measure-Screen $BaselineExecutable 'baseline-shared' $false;Measure-Screen $BaselineExecutable 'baseline-windows-brightness' $false $false $true;Measure-Screen $Executable 'current-shared' $false;Measure-Screen $Executable 'current-profiles' $true;Measure-Screen $Executable 'current-brightness-keys' $false $true;Measure-Screen $Executable 'current-windows-brightness' $false $false $true}
+ $summary=@(foreach($mode in @('baseline-shared','baseline-windows-brightness','current-shared','current-profiles','current-brightness-keys','current-windows-brightness')){
   $group=@($rows | Where-Object { $_.mode -eq $mode })
   [ordered]@{mode=$mode;medianPrivateMiB=(Median $group.privateMiB);minPrivateMiB=($group.privateMiB | Measure-Object -Minimum).Minimum;maxPrivateMiB=($group.privateMiB | Measure-Object -Maximum).Maximum;medianWorkingSetMiB=(Median $group.workingSetMiB);medianCpuMilliseconds=(Median $group.cpuMilliseconds)}
  })
@@ -62,7 +62,8 @@ try{
  $summary | Format-Table | Out-String | Write-Output
  if($current.medianPrivateMiB -gt $baseline.medianPrivateMiB*1.20){throw 'Shared tray private memory regressed by more than 20%; inspect the comparison artifact.'}
  $follow=$summary | Where-Object mode -eq 'current-windows-brightness'
- if($follow.medianPrivateMiB -gt $baseline.medianPrivateMiB*1.20 -or $follow.medianCpuMilliseconds -gt 50){throw 'Windows brightness following exceeded the shared tray idle memory/CPU budget.'}
+ $baselineFollow=$summary | Where-Object mode -eq 'baseline-windows-brightness'
+ if($follow.medianPrivateMiB -gt $baselineFollow.medianPrivateMiB*1.20 -or $follow.medianCpuMilliseconds -gt 50){throw 'Windows brightness following exceeded the matching baseline idle memory/CPU budget.'}
  if($report.currentBytes -gt 1MB){throw 'Native executable exceeds the 1 MiB engineering budget.'}
  if($current.medianCpuMilliseconds -gt 50){throw 'Unexpected paused shared-tray CPU; inspect samples before merging.'}
 }finally{
