@@ -18,13 +18,17 @@ def png(size: int) -> bytes:
                 for sx in range(samples):
                     u = (x + (sx + 0.5) / samples) / size
                     v = (y + (sy + 0.5) / samples) / size
-                    # Rounded violet tile and a crescent, with an independent star.
+                    # Midnight aperture: violet rim, ivory crescent and diamond glint.
                     dx = max(abs(u - .5) - .28, 0)
                     dy = max(abs(v - .5) - .28, 0)
                     inside = dx * dx + dy * dy <= .19 ** 2
-                    rgb = (int(94 + 28 * v), int(79 + 19 * v), int(219 + 10 * v))
-                    moon = math.hypot(u - .46, v - .49) < .245 and math.hypot(u - .57, v - .39) > .227
-                    star = abs(u - .717) + abs(v - .28) < .065
+                    light = max(0, 1-math.hypot(u-.25,v-.16)/.95)
+                    rgb = (int(36+40*light),int(29+27*light),int(72+74*light))
+                    rim = dx*dx+dy*dy > .177**2
+                    if rim:
+                        rgb = (int(113+31*light),int(92+29*light),int(206+36*light))
+                    moon = math.hypot(u-.46,v-.51)<.258 and math.hypot(u-.574,v-.412)>.238
+                    star = abs(u-.728)+abs(v-.276)<.058
                     if moon or star:
                         rgb = (255, 250, 235)
                     color = (*rgb, 255) if inside else (0, 0, 0, 0)

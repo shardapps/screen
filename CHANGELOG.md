@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.1 — Public beta
+
+- Publish the user-tested quick controls, editable presets, pinned mini panel, flexible pauses, refined themes and optional keyboard compatibility from 1.3.0.
+- Skip redundant native text and checkbox changes during brightness updates; short labels use stack storage instead of allocating a comparison string.
+- Refine the crescent app icon while retaining tiny native assets.
+- Keep marketing artwork out of setup and portable downloads while retaining local Markdown help.
+- Refresh the Store gallery, description and project documentation for the public beta.
+
+
 ## 1.3.0 — Beta polish (unreleased)
 
 - Add four saved quick brightness levels to the mini panel. Save the current level into any slot from Displays settings; presets act on the selected screen/current desktop.

@@ -3,7 +3,7 @@
   #error AppBinary must point to a built Screen.exe
 #endif
 #ifndef AppVersion
-  #define AppVersion "1.3.0"
+  #define AppVersion "1.3.1"
 #endif
 #ifndef TargetArchitecture
   #error TargetArchitecture must be x64 or arm64
@@ -53,7 +53,8 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription:
 Source: "{#AppBinary}"; DestDir: "{app}"; DestName: "Screen.exe"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\*.md"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\docs\*"; DestDir: "{app}\docs"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Keep local help; Store marketing artwork belongs in the repository, not each install.
+Source: "..\docs\*.md"; DestDir: "{app}\docs"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\Screen Dimmer by Shardapps"; Filename: "{app}\Screen.exe"; WorkingDir: "{app}"

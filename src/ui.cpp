@@ -55,6 +55,22 @@ double interactionAmount(HWND window) {
         if(GetWindowSubclass(window,procedure,1,&value) && value) return reinterpret_cast<Interaction*>(value)->motion.value;
     return 0;
 }
+bool setText(HWND window,const std::wstring& value) {
+    if(!window) return false;
+    const auto length=GetWindowTextLengthW(window);
+    if(static_cast<size_t>(length)==value.size()) {
+        wchar_t textBuffer[256]{};
+        if(length<256) {
+            GetWindowTextW(window,textBuffer,256);
+            if(value==textBuffer) return false;
+        } else {
+            std::wstring current(static_cast<size_t>(length)+1,L'\0');
+            GetWindowTextW(window,current.data(),length+1);current.resize(static_cast<size_t>(length));
+            if(value==current) return false;
+        }
+    }
+    return SetWindowTextW(window,value.c_str())!=FALSE;
+}
 Palette palette(int theme) {
     HIGHCONTRASTW contrast{sizeof(contrast)};
     SystemParametersInfoW(SPI_GETHIGHCONTRAST, sizeof(contrast), &contrast, 0);

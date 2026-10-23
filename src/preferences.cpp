@@ -16,10 +16,7 @@ constexpr int navBase = 1000, displayId = 1010, levelId = 1011, percentId = 1012
     brightnessKeysId = 1400, testKeysId = 1401, keyStatusId = 1402, keyFeedbackId = 1403, windowsBrightnessId = 1404;
 constexpr int steps[] = {1,2,5,10};
 void setText(HWND window, const std::wstring& value) {
-    std::wstring current(static_cast<size_t>(GetWindowTextLengthW(window))+1, L'\0');
-    GetWindowTextW(window, current.data(), static_cast<int>(current.size()));
-    current.resize(wcslen(current.c_str()));
-    if (current != value) SetWindowTextW(window, value.c_str());
+    ui::setText(window,value);
 }
 }
 PreferencesWindow::PreferencesWindow(Settings& settings, std::vector<Monitor>& displays, std::wstring& selected,
@@ -211,10 +208,11 @@ void PreferencesWindow::page(int index) {
 void PreferencesWindow::refresh(bool rebuildDisplays) {
     if (!window_ || refreshing_) return;
     refreshing_=true;
-    SendDlgItemMessageW(window_,brightnessKeysId,BM_SETCHECK,settings_.brightnessKeys?BST_CHECKED:BST_UNCHECKED,0);
-    SendDlgItemMessageW(window_,windowsBrightnessId,BM_SETCHECK,settings_.windowsBrightness?BST_CHECKED:BST_UNCHECKED,0);
-    SendDlgItemMessageW(window_,keyFeedbackId,BM_SETCHECK,settings_.brightnessKeyFeedback?BST_CHECKED:BST_UNCHECKED,0);
-    SendDlgItemMessageW(window_,pinId,BM_SETCHECK,settings_.keepPanelOpen?BST_CHECKED:BST_UNCHECKED,0);
+    for(const auto [id,checked]:{std::pair{brightnessKeysId,settings_.brightnessKeys},{windowsBrightnessId,settings_.windowsBrightness},
+        {keyFeedbackId,settings_.brightnessKeyFeedback},{pinId,settings_.keepPanelOpen}}) {
+        const auto control=GetDlgItem(window_,id);const auto value=checked?BST_CHECKED:BST_UNCHECKED;
+        if(SendMessageW(control,BM_GETCHECK,0,0)!=value) SendMessageW(control,BM_SETCHECK,value,0);
+    }
     if (appliedTheme_ != settings_.theme || rebuildDisplays) theme();
     const auto combo=GetDlgItem(window_,displayId);
     if (rebuildDisplays) {
