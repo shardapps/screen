@@ -1,0 +1,300 @@
+{
+  "sampleSeconds": 3,
+  "samples": 5,
+  "currentBytes": 570368,
+  "baselineBytes": 541696,
+  "os": "Microsoft Windows NT 10.0.26100.0",
+  "summary": [
+    {
+      "mode": "baseline-shared",
+      "medianPrivateMiB": 2.289,
+      "minPrivateMiB": 2.277,
+      "maxPrivateMiB": 2.301,
+      "medianWorkingSetMiB": 13.582,
+      "medianCpuMilliseconds": 0.0
+    },
+    {
+      "mode": "baseline-windows-brightness",
+      "medianPrivateMiB": 2.379,
+      "minPrivateMiB": 2.367,
+      "maxPrivateMiB": 2.422,
+      "medianWorkingSetMiB": 13.742,
+      "medianCpuMilliseconds": 0.0
+    },
+    {
+      "mode": "current-shared",
+      "medianPrivateMiB": 2.289,
+      "minPrivateMiB": 2.254,
+      "maxPrivateMiB": 2.309,
+      "medianWorkingSetMiB": 13.656,
+      "medianCpuMilliseconds": 0.0
+    },
+    {
+      "mode": "current-profiles",
+      "medianPrivateMiB": 2.688,
+      "minPrivateMiB": 2.625,
+      "maxPrivateMiB": 2.695,
+      "medianWorkingSetMiB": 20.445,
+      "medianCpuMilliseconds": 0.0
+    },
+    {
+      "mode": "current-brightness-keys",
+      "medianPrivateMiB": 2.297,
+      "minPrivateMiB": 2.238,
+      "maxPrivateMiB": 2.328,
+      "medianWorkingSetMiB": 13.699,
+      "medianCpuMilliseconds": 0.0
+    },
+    {
+      "mode": "current-windows-brightness",
+      "medianPrivateMiB": 2.383,
+      "minPrivateMiB": 2.332,
+      "maxPrivateMiB": 2.387,
+      "medianWorkingSetMiB": 13.828,
+      "medianCpuMilliseconds": 0.0
+    }
+  ],
+  "raw": [
+    {
+      "mode": "baseline-shared",
+      "privateMiB": 2.289,
+      "workingSetMiB": 13.57,
+      "cpuMilliseconds": 0.0,
+      "handles": 180,
+      "threads": 5
+    },
+    {
+      "mode": "baseline-windows-brightness",
+      "privateMiB": 2.379,
+      "workingSetMiB": 13.727,
+      "cpuMilliseconds": 0.0,
+      "handles": 182,
+      "threads": 7
+    },
+    {
+      "mode": "current-shared",
+      "privateMiB": 2.289,
+      "workingSetMiB": 13.652,
+      "cpuMilliseconds": 0.0,
+      "handles": 180,
+      "threads": 5
+    },
+    {
+      "mode": "current-profiles",
+      "privateMiB": 2.688,
+      "workingSetMiB": 20.434,
+      "cpuMilliseconds": 0.0,
+      "handles": 224,
+      "threads": 8
+    },
+    {
+      "mode": "current-brightness-keys",
+      "privateMiB": 2.238,
+      "workingSetMiB": 13.668,
+      "cpuMilliseconds": 0.0,
+      "handles": 180,
+      "threads": 5
+    },
+    {
+      "mode": "current-windows-brightness",
+      "privateMiB": 2.387,
+      "workingSetMiB": 13.828,
+      "cpuMilliseconds": 0.0,
+      "handles": 182,
+      "threads": 7
+    },
+    {
+      "mode": "baseline-shared",
+      "privateMiB": 2.289,
+      "workingSetMiB": 13.582,
+      "cpuMilliseconds": 0.0,
+      "handles": 180,
+      "threads": 5
+    },
+    {
+      "mode": "baseline-windows-brightness",
+      "privateMiB": 2.367,
+      "workingSetMiB": 13.742,
+      "cpuMilliseconds": 0.0,
+      "handles": 182,
+      "threads": 7
+    },
+    {
+      "mode": "current-shared",
+      "privateMiB": 2.289,
+      "workingSetMiB": 13.656,
+      "cpuMilliseconds": 0.0,
+      "handles": 180,
+      "threads": 5
+    },
+    {
+      "mode": "current-profiles",
+      "privateMiB": 2.695,
+      "workingSetMiB": 20.445,
+      "cpuMilliseconds": 0.0,
+      "handles": 224,
+      "threads": 8
+    },
+    {
+      "mode": "current-brightness-keys",
+      "privateMiB": 2.328,
+      "workingSetMiB": 13.73,
+      "cpuMilliseconds": 0.0,
+      "handles": 180,
+      "threads": 5
+    },
+    {
+      "mode": "current-windows-brightness",
+      "privateMiB": 2.387,
+      "workingSetMiB": 13.84,
+      "cpuMilliseconds": 0.0,
+      "handles": 182,
+      "threads": 7
+    },
+    {
+      "mode": "baseline-shared",
+      "privateMiB": 2.293,
+      "workingSetMiB": 13.578,
+      "cpuMilliseconds": 0.0,
+      "handles": 180,
+      "threads": 5
+    },
+    {
+      "mode": "baseline-windows-brightness",
+      "privateMiB": 2.371,
+      "workingSetMiB": 13.738,
+      "cpuMilliseconds": 0.0,
+      "handles": 182,
+      "threads": 7
+    },
+    {
+      "mode": "current-shared",
+      "privateMiB": 2.305,
+      "workingSetMiB": 13.668,
+      "cpuMilliseconds": 0.0,
+      "handles": 180,
+      "threads": 5
+    },
+    {
+      "mode": "current-profiles",
+      "privateMiB": 2.625,
+      "workingSetMiB": 20.406,
+      "cpuMilliseconds": 0.0,
+      "handles": 224,
+      "threads": 8
+    },
+    {
+      "mode": "current-brightness-keys",
+      "privateMiB": 2.293,
+      "workingSetMiB": 13.699,
+      "cpuMilliseconds": 0.0,
+      "handles": 180,
+      "threads": 5
+    },
+    {
+      "mode": "current-windows-brightness",
+      "privateMiB": 2.332,
+      "workingSetMiB": 13.793,
+      "cpuMilliseconds": 0.0,
+      "handles": 182,
+      "threads": 7
+    },
+    {
+      "mode": "baseline-shared",
+      "privateMiB": 2.301,
+      "workingSetMiB": 13.586,
+      "cpuMilliseconds": 0.0,
+      "handles": 180,
+      "threads": 5
+    },
+    {
+      "mode": "baseline-windows-brightness",
+      "privateMiB": 2.422,
+      "workingSetMiB": 13.762,
+      "cpuMilliseconds": 0.0,
+      "handles": 182,
+      "threads": 7
+    },
+    {
+      "mode": "current-shared",
+      "privateMiB": 2.309,
+      "workingSetMiB": 13.66,
+      "cpuMilliseconds": 0.0,
+      "handles": 180,
+      "threads": 5
+    },
+    {
+      "mode": "current-profiles",
+      "privateMiB": 2.684,
+      "workingSetMiB": 20.449,
+      "cpuMilliseconds": 0.0,
+      "handles": 224,
+      "threads": 8
+    },
+    {
+      "mode": "current-brightness-keys",
+      "privateMiB": 2.297,
+      "workingSetMiB": 13.715,
+      "cpuMilliseconds": 0.0,
+      "handles": 180,
+      "threads": 5
+    },
+    {
+      "mode": "current-windows-brightness",
+      "privateMiB": 2.352,
+      "workingSetMiB": 13.812,
+      "cpuMilliseconds": 0.0,
+      "handles": 182,
+      "threads": 7
+    },
+    {
+      "mode": "baseline-shared",
+      "privateMiB": 2.277,
+      "workingSetMiB": 13.582,
+      "cpuMilliseconds": 0.0,
+      "handles": 180,
+      "threads": 5
+    },
+    {
+      "mode": "baseline-windows-brightness",
+      "privateMiB": 2.398,
+      "workingSetMiB": 13.773,
+      "cpuMilliseconds": 0.0,
+      "handles": 182,
+      "threads": 7
+    },
+    {
+      "mode": "current-shared",
+      "privateMiB": 2.254,
+      "workingSetMiB": 13.648,
+      "cpuMilliseconds": 0.0,
+      "handles": 180,
+      "threads": 5
+    },
+    {
+      "mode": "current-profiles",
+      "privateMiB": 2.695,
+      "workingSetMiB": 20.461,
+      "cpuMilliseconds": 0.0,
+      "handles": 222,
+      "threads": 8
+    },
+    {
+      "mode": "current-brightness-keys",
+      "privateMiB": 2.297,
+      "workingSetMiB": 13.695,
+      "cpuMilliseconds": 0.0,
+      "handles": 180,
+      "threads": 5
+    },
+    {
+      "mode": "current-windows-brightness",
+      "privateMiB": 2.383,
+      "workingSetMiB": 13.828,
+      "cpuMilliseconds": 0.0,
+      "handles": 182,
+      "threads": 7
+    }
+  ],
+  "caveat": "Same-host paused tray samples. Excludes compositor/GPU allocations, active dimming and real virtual-desktop switching. Profile mode loads three saved profiles; detection depends on the hosted session."
+}

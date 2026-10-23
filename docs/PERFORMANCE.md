@@ -1,5 +1,19 @@
 # Performance measurements
 
+## Public beta 1.3.1 — October 24, 2026
+
+Source `95e2328`, [Windows CI 40010674140](https://github.com/shardapps/screen/actions/runs/40010674140), same-host pinned 1.2.1 comparison. Five interleaved three-second paused-idle samples per mode; process working set and private commit, excluding active rendering and compositor/GPU memory.
+
+| Mode | 1.2.1 working set / private MiB | 1.3.1 working set / private MiB |
+| --- | --- | --- |
+| Shared | 13.582 / 2.289 | 13.656 / 2.289 |
+| Windows-linked | 13.742 / 2.379 | 13.828 / 2.383 |
+| Current desktop profiles | — | 20.445 / 2.688 |
+| Current native keys | — | 13.699 / 2.297 |
+
+Median process CPU delta was 0 ms in the short idle samples. This is not a zero-CPU guarantee or a benchmark of motion smoothness. Executable: 570,368 bytes including the refreshed native icon. Setup: 2,350,321 bytes; portable ZIP: 336,629 bytes on that hosted build. Marketing artwork is excluded from payloads; final release files may differ slightly with documentation. [Raw samples](store/beta-1/performance-comparison.json).
+
+
 ## Regression comparison for the next release
 
 The x64 Windows CI job builds the pinned compatibility source (`9e5f74b`, version 1.2.1) and the current source with the same toolchain on the same host. `scripts/performance-test.ps1` interleaves five samples of six modes: baseline shared/Windows-following and current shared/Windows-following/native-key/profile modes. Each process is forced paused; the script preserves the exact preference file and shuts down only its own copy. Historical Store-alpha comparisons below retain their original baseline.
@@ -21,7 +35,7 @@ Frame timers are created lazily and armed only during brightness or flyout motio
 | Metric | Store alpha baseline | Updated shared mode | Updated desktop profiles |
 | --- | ---: | ---: | ---: |
 | Private committed memory, median | 2.297 MiB | 2.281 MiB | 2.664 MiB |
-| Private committed memory, range | 2.266–2.309 MiB | 2.270–2.301 MiB | 2.629–2.703 MiB |
+| Private committed memory, range | 2.266â€“2.309 MiB | 2.270â€“2.301 MiB | 2.629â€“2.703 MiB |
 | Working set, median | 13.574 MiB | 13.582 MiB | 20.359 MiB |
 | Process CPU time over 3 seconds, median | 0 ms measured | 0 ms measured | 0 ms measured |
 
@@ -39,7 +53,7 @@ Measured October 19, 2026 with the same Release x64 compiler/OS/display setup as
 | Private committed memory | 2.25 MiB | 2.25 MiB | 2.91 MiB | 2.89 MiB |
 | Process CPU time over 10 seconds | 0 ms measured | 0 ms measured | 0 ms measured | 0 ms measured |
 
-The executable was 482,304 bytes (471 KiB). Settings are created on demand; fonts, brushes and controls are released on close. Windows may keep loaded shared UI pages resident afterward, as the final column shows. Eight repeated opens/closes measured 36 → 37 GDI objects, with no per-open growth. These single local samples do not establish a universal memory budget or literal zero CPU, and exclude compositor/GPU costs. CI repeats behavioral and resource-lifetime checks rather than asserting machine-specific memory values.
+The executable was 482,304 bytes (471 KiB). Settings are created on demand; fonts, brushes and controls are released on close. Windows may keep loaded shared UI pages resident afterward, as the final column shows. Eight repeated opens/closes measured 36 â†’ 37 GDI objects, with no per-open growth. These single local samples do not establish a universal memory budget or literal zero CPU, and exclude compositor/GPU costs. CI repeats behavioral and resource-lifetime checks rather than asserting machine-specific memory values.
 
 ## v0.3.0 desktop backend sample
 
