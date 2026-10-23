@@ -5,11 +5,43 @@
 #include <cstring>
 #include <map>
 #include <vector>
+#include <dbt.h>
 
 namespace screen {
 namespace {
 constexpr USHORT consumerPage=0x0c,consumerControl=1,brightnessUp=0x6f,brightnessDown=0x70;
 constexpr UINT maxPacket=65536,maxPreparsed=65536,maxDevices=16,maxCaps=512,maxUsages=512;
+constexpr GUID currentBrightness{0x8ffee2c6,0x2d01,0x46be,{0xad,0xb9,0x39,0x8a,0xdd,0xc5,0xb4,0xff}};
+}
+WindowsBrightness::~WindowsBrightness() {
+    if(notification_) UnregisterPowerSettingNotification(notification_);
+    if(owner_) WTSUnRegisterSessionNotification(owner_);
+}
+bool WindowsBrightness::start(HWND owner) {
+    if(owner_) return owner_==owner && notification_;
+    if(!IsWindow(owner) || !WTSRegisterSessionNotification(owner,NOTIFY_FOR_THIS_SESSION)) return false;
+    owner_=owner;registration();
+    if(!notification_) { WTSUnRegisterSessionNotification(owner_);owner_=nullptr;return false; }
+    return true;
+}
+void WindowsBrightness::registration() {
+    if(notification_) UnregisterPowerSettingNotification(notification_);
+    notification_=nullptr;state_.clear();
+    if(owner_ && !locked_ && !suspended_)
+        notification_=RegisterPowerSettingNotification(owner_,&currentBrightness,DEVICE_NOTIFY_WINDOW_HANDLE);
+}
+std::optional<unsigned> WindowsBrightness::input(const POWERBROADCAST_SETTING& value) {
+    if(!notification_ || !IsEqualGUID(value.PowerSetting,currentBrightness) || value.DataLength!=sizeof(DWORD)) return {};
+    DWORD level=0;std::memcpy(&level,value.Data,sizeof(level));
+    return state_.update(level);
+}
+void WindowsBrightness::session(WPARAM event) {
+    if(event==WTS_SESSION_LOCK || event==WTS_CONSOLE_DISCONNECT || event==WTS_REMOTE_DISCONNECT) { locked_=true;registration(); }
+    else if(event==WTS_SESSION_UNLOCK || event==WTS_CONSOLE_CONNECT || event==WTS_REMOTE_CONNECT) { locked_=false;registration(); }
+}
+void WindowsBrightness::power(WPARAM event) {
+    if(event==PBT_APMSUSPEND) { suspended_=true;registration(); }
+    else if(event==PBT_APMRESUMEAUTOMATIC || event==PBT_APMRESUMESUSPEND) { suspended_=false;registration(); }
 }
 struct BrightnessKeys::Impl {
     struct Device {

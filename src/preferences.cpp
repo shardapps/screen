@@ -13,7 +13,7 @@ constexpr int navBase = 1000, displayId = 1010, levelId = 1011, percentId = 1012
     systemStartupId = 1206, startupStatusId = 1207,
     desktopsEnabledId = 1300, currentDesktopId = 1301, desktopPickerId = 1302,
     desktopLevelId = 1303, desktopPercentId = 1304, resetDesktopId = 1305,
-    brightnessKeysId = 1400, testKeysId = 1401, keyStatusId = 1402, keyFeedbackId = 1403;
+    brightnessKeysId = 1400, testKeysId = 1401, keyStatusId = 1402, keyFeedbackId = 1403, windowsBrightnessId = 1404;
 constexpr int steps[] = {1,2,5,10};
 constexpr int presets[] = {25,50,75,100};
 void setText(HWND window, const std::wstring& value) {
@@ -121,13 +121,14 @@ void PreferencesWindow::createControls() {
     add(L"BUTTON",L"Reset this profile to shared brightness",button,resetDesktopId,3,24,470,472,40);
     label(L"Switch desktops normally with Windows. Saved levels apply automatically. Fine-tune individual monitors in Displays while that desktop is active.",3,24,530,472,62);
     label(L"Your keyboard, your screen",4,24,158,472,24);
-    add(L"BUTTON",L"Use keyboard brightness keys (beta)",BS_AUTOCHECKBOX | WS_TABSTOP,brightnessKeysId,4,24,202,472,38);
-    add(L"BUTTON",L"Show mini panel for keyboard changes",BS_AUTOCHECKBOX | WS_TABSTOP,keyFeedbackId,4,24,246,472,38);
-    label(L"Adjusts app brightness for the selected screen and current desktop profile. The mini panel appears briefly without taking focus.",4,24,300,472,48);
-    add(L"BUTTON",L"Test brightness keys",button,testKeysId,4,24,360,228,40);
-    label(L"Off. Run the test to check your keyboard.",4,24,420,472,48,keyStatusId);
-    label(L"Your laptop may also change its hardware brightness. If both changes feel too strong, turn this option off. Firmware-only Fn keys cannot be detected.",4,24,484,472,64);
-    label(L"Fallback: Ctrl + Alt + Up / Down adjusts all displays in the current desktop profile. Change the step in Preferences.",4,24,568,472,48);
+    add(L"BUTTON",L"Use keyboard brightness keys (beta)",BS_AUTOCHECKBOX | WS_TABSTOP,brightnessKeysId,4,24,190,472,38);
+    add(L"BUTTON",L"Follow Windows brightness (compatibility)",BS_AUTOCHECKBOX | WS_TABSTOP,windowsBrightnessId,4,24,232,472,38);
+    add(L"BUTTON",L"Show mini panel for brightness controls",BS_AUTOCHECKBOX | WS_TABSTOP,keyFeedbackId,4,24,274,472,38);
+    label(L"Choose one mode. Native keys use your step; compatibility follows Windows' level with an 8% safety floor. Applies to the selected screen and desktop.",4,24,316,472,58);
+    add(L"BUTTON",L"Test brightness controls",button,testKeysId,4,24,384,248,40);
+    label(L"Off. Run the test to check your keyboard.",4,24,436,472,48,keyStatusId);
+    label(L"Compatibility also follows the Windows slider and automatic brightness. Screen never writes to the backlight; Windows may still change it. The initial level leaves saved dimming unchanged.",4,24,496,472,72);
+    label(L"Ctrl + Alt + Up / Down adjusts all displays in this desktop. Alt + S opens the mini panel.",4,24,578,472,48);
     fonts(); theme(); refresh(true); layout();
 }
 void PreferencesWindow::fonts() {
@@ -201,6 +202,7 @@ void PreferencesWindow::refresh(bool rebuildDisplays) {
     if (!window_ || refreshing_) return;
     refreshing_=true;
     SendDlgItemMessageW(window_,brightnessKeysId,BM_SETCHECK,settings_.brightnessKeys?BST_CHECKED:BST_UNCHECKED,0);
+    SendDlgItemMessageW(window_,windowsBrightnessId,BM_SETCHECK,settings_.windowsBrightness?BST_CHECKED:BST_UNCHECKED,0);
     SendDlgItemMessageW(window_,keyFeedbackId,BM_SETCHECK,settings_.brightnessKeyFeedback?BST_CHECKED:BST_UNCHECKED,0);
     if (appliedTheme_ != settings_.theme || rebuildDisplays) theme();
     const auto combo=GetDlgItem(window_,displayId);
@@ -286,7 +288,7 @@ void PreferencesWindow::startupState(StartupState state,bool busy) { startup_=st
 void PreferencesWindow::brightnessKeyStatus(const std::wstring& text,bool testing) {
     if(!window_) return;
     setText(GetDlgItem(window_,keyStatusId),text);
-    setText(GetDlgItem(window_,testKeysId),testing?L"Stop test":L"Test brightness keys");
+    setText(GetDlgItem(window_,testKeysId),testing?L"Stop test":L"Test brightness controls");
 }
 void PreferencesWindow::identify() {
     clearIdentifiers();
@@ -341,6 +343,7 @@ void PreferencesWindow::command(int id,int notification) {
             if(id==startupId) action_(PreferenceAction::startup,checked);
             if(id==desktopsEnabledId) action_(PreferenceAction::desktopProfiles,checked);
             if(id==brightnessKeysId) action_(PreferenceAction::brightnessKeys,checked);
+            if(id==windowsBrightnessId) action_(PreferenceAction::windowsBrightness,checked);
             if(id==keyFeedbackId) action_(PreferenceAction::brightnessKeyFeedback,checked);
         }
     }
@@ -397,7 +400,7 @@ LRESULT PreferencesWindow::customDraw(NMCUSTOMDRAW& draw) {
     if(draw.dwDrawStage!=CDDS_PREPAINT) return CDRF_DODEFAULT;
     const int id=GetDlgCtrlID(draw.hdr.hwndFrom);
     if(id==levelId || id==desktopLevelId) { ui::drawSlider(draw.hdr.hwndFrom,draw.hdc,colors_,dpi_); return CDRF_SKIPDEFAULT; }
-    if((id>=warmId && id<=startupId) || id==desktopsEnabledId || id==brightnessKeysId || id==keyFeedbackId) {
+    if((id>=warmId && id<=startupId) || id==desktopsEnabledId || id==brightnessKeysId || id==keyFeedbackId || id==windowsBrightnessId) {
         const auto dc=draw.hdc; auto rect=draw.rc; FillRect(dc,&rect,background_);
         const bool checked=SendMessageW(draw.hdr.hwndFrom,BM_GETCHECK,0,0)==BST_CHECKED;
         const bool enabled=IsWindowEnabled(draw.hdr.hwndFrom)!=FALSE;

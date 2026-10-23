@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.1 — Compatibility fix (unreleased)
+
+- Add a separate, off-by-default Windows brightness compatibility mode for systems that report brightness changes without delivering HID sun-key reports.
+- Follow the Windows percentage on the selected display/desktop, with the existing 8% safety floor and independent App brightness mini-panel feedback.
+- Preserve saved dimming on initial notification; ignore duplicate levels, batch saves, and release/rebaseline notifications on lock/sleep/resume without polling or an added thread.
+- Keep timed pause effective; Restore and emergency recovery disable compatibility following so automatic changes cannot immediately reapply it.
+- State explicitly that compatibility also follows Windows-slider and automatic changes; it does not intercept Fn keys or suppress hardware handling.
+- Keep replacement release gated on hands-on acceptance. Beta 1 downloads were withdrawn after a reported key-input failure.
+
 ## 1.2.0 — Beta 1
 
 - Add opt-in support for standard HID keyboard brightness keys, with a 15-second compatibility test and existing Ctrl+Alt+Up/Down fallback.

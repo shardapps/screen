@@ -70,7 +70,8 @@ struct Settings {
     int openingShortcut = 0; // Alt+S, Ctrl+Alt+S, Ctrl+Shift+S.
     bool resumeOnLaunch = false;
     bool brightnessKeys = false; // Optional consumer-HID brightness input; never captures typing.
-    bool brightnessKeyFeedback = true; // Only used after the brightness-key opt-in.
+    bool windowsBrightness = false; // Separate opt-in: follow Windows logical level changes, not key events.
+    bool brightnessKeyFeedback = true; // Independent feedback for either opt-in and the fallback shortcuts.
     bool separateDesktops = false;
     std::wstring activeDesktop; // Runtime context; the shared baseline is never replaced on a switch.
     std::map<std::wstring, BrightnessProfile> desktops;

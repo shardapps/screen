@@ -5,6 +5,9 @@
 #include <sstream>
 #include <iostream>
 #include <string_view>
+#include <cstring>
+#include <array>
+#include <wtsapi32.h>
 
 namespace {
 int notifications=0;
@@ -45,6 +48,13 @@ int main(int argc,char** argv) {
     std::wstringstream text; writeSettings(text,saved); auto loaded=parseSettings(text);
     check(loaded.brightnessKeys,"Brightness-key opt-in survives a settings round trip");
     check(!loaded.brightnessKeyFeedback,"The independent mini-panel preference survives restart");
+    std::wistringstream compatibility(L"brightnessKeys=1\nwindowsBrightness=1\n");
+    auto followSaved=parseSettings(compatibility);
+    check(followSaved.windowsBrightness && !followSaved.brightnessKeys,"Compatibility and native input cannot run together after loading");
+    std::wstringstream followText;writeSettings(followText,followSaved);
+    check(parseSettings(followText).windowsBrightness,"Windows brightness compatibility survives a settings round trip");
+    std::wistringstream invalidFollow(L"windowsBrightness=2\n");
+    check(!parseSettings(invalidFollow).windowsBrightness,"Only explicit value 1 enables Windows brightness following");
     check(!loaded.paused && loaded.separateDesktops && loaded.activeDesktop.empty(),"Persist options but never persist stale active desktop context");
     loaded.activeDesktop=a;
     check(loaded.currentBrightness()==18 && loaded.forMonitor(L"DISPLAY-A")==18,"Round-trip must preserve a cleared profile override map");
@@ -118,6 +128,32 @@ int main(int argc,char** argv) {
     for(int i=0;i<20;++i) { BrightnessKeys keys;check(keys.start(window),"Repeated input enable must succeed"); }
     GetProcessHandleCount(GetCurrentProcess(),&keyAfter);
     check(keyAfter<=keyBefore+2 && !brightnessRegistration(),"Repeated enable/disable releases module, session and registration resources");
+    {
+        WindowsBrightness follow;
+        check(!follow.start(nullptr),"An invalid owner cannot register brightness notifications");
+        check(follow.start(window),"Compatibility mode registers Windows brightness notifications");
+        alignas(POWERBROADCAST_SETTING) std::array<BYTE,sizeof(POWERBROADCAST_SETTING)+sizeof(DWORD)> bytes{};
+        auto& event=*reinterpret_cast<POWERBROADCAST_SETTING*>(bytes.data());
+        event.PowerSetting={0x8ffee2c6,0x2d01,0x46be,{0xad,0xb9,0x39,0x8a,0xdd,0xc5,0xb4,0xff}};
+        event.DataLength=sizeof(DWORD);
+        const auto level=[&](DWORD value){std::memcpy(event.Data,&value,sizeof(value));return follow.input(event);};
+        check(!level(40) && !level(40) && level(30)==30u,"Power notifications baseline once, ignore duplicates and deliver changed levels");
+        event.DataLength=1;check(!level(20),"Truncated power payloads must be ignored");
+        event.DataLength=sizeof(DWORD);event.PowerSetting.Data1=0;
+        check(!level(20),"Unrelated power notifications cannot affect app brightness");
+        event.PowerSetting.Data1=0x8ffee2c6;
+        check(!level(1000) && level(20)==20u,"Malformed percentages must leave the previous baseline intact");
+        follow.session(WTS_SESSION_LOCK);check(!level(10),"Lock suspends compatibility notifications");
+        follow.session(WTS_SESSION_UNLOCK);check(!level(40) && level(35)==35u,"Unlock registers a new baseline without applying its snapshot");
+        follow.power(PBT_APMSUSPEND);check(!level(30),"Suspend removes the brightness notification");
+        follow.power(PBT_APMRESUMEAUTOMATIC);check(!level(60) && level(50)==50u,"Resume baselines before a subsequent change");
+        follow.session(WTS_SESSION_LOCK);follow.power(PBT_APMRESUMEAUTOMATIC);
+        check(!level(40),"Power resume cannot re-enable listening during session lock");
+    }
+    DWORD followBefore=0,followAfter=0;GetProcessHandleCount(GetCurrentProcess(),&followBefore);
+    for(int i=0;i<20;++i) { WindowsBrightness follow;check(follow.start(window),"Repeated compatibility registration must succeed"); }
+    GetProcessHandleCount(GetCurrentProcess(),&followAfter);
+    check(followAfter<=followBefore+2 && !brightnessRegistration(),"Compatibility teardown must release resources without registering keyboard input");
     DestroyWindow(window);RegCloseKey(root);RegDeleteTreeW(HKEY_CURRENT_USER,path.c_str());
     pump();
     {

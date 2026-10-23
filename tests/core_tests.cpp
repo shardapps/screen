@@ -79,7 +79,15 @@ int main() {
     fade.snap();
     check(fade.value == 120 && fade.velocity == 0, "Emergency / reduced-motion changes must snap immediately");
     Settings settings;
+    WindowsBrightnessState windowsLevel;
+    check(!windowsLevel.update(40),"The initial Windows snapshot must not replace saved dimming");
+    check(!windowsLevel.update(40),"Duplicate Windows levels must not reopen feedback or write settings");
+    check(!windowsLevel.update(101) && windowsLevel.update(30)==30u,"Invalid Windows levels must not poison the baseline");
+    check(windowsLevel.update(0)==0u && windowsLevel.update(100)==100u,"Windows endpoints must remain observable before the app safety clamp");
+    windowsLevel.clear();
+    check(!windowsLevel.update(70) && windowsLevel.update(65)==65u,"Resuming must baseline before applying a subsequent level change");
     check(settings.paused, "First run must be transparent");
+    check(!settings.windowsBrightness,"Windows brightness compatibility must be a separate opt-in");
     check(!settings.resumeOnLaunch && settings.theme == 0 && settings.adjustmentStep == 5 && settings.openingShortcut == 0,
           "New preferences must preserve safe startup and familiar defaults");
     settings.monitors[L"DISPLAY-A"] = 30;
