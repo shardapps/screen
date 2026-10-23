@@ -20,6 +20,7 @@ public static class PreferencesTest {
  [DllImport("user32.dll")]public static extern bool ShowWindow(IntPtr hwnd,int command);
  [DllImport("user32.dll")]public static extern bool IsWindow(IntPtr hwnd);
  [DllImport("user32.dll")]public static extern bool IsWindowEnabled(IntPtr hwnd);
+ [DllImport("user32.dll")]public static extern IntPtr GetForegroundWindow();
  [DllImport("user32.dll")]public static extern bool SetWindowPos(IntPtr hwnd,IntPtr after,int x,int y,int w,int h,uint flags);
  [DllImport("user32.dll")]public static extern bool GetLayeredWindowAttributes(IntPtr hwnd,out uint color,out byte alpha,out uint flags);
  [DllImport("user32.dll")]public static extern uint GetGuiResources(IntPtr process,uint flags);
@@ -219,6 +220,41 @@ try{
  }
  Capture 'settings-desktops.png'
  Send $desktopProfiles 0x00F5;Wait-SettingsFile 'separateDesktops=0'
+ Send $preferences 0x0111 1015;Wait-SettingsFile 'brightness=100'
+ # Consumer brightness input is an explicit opt-in; testing never enables it.
+ Send $preferences 0x0111 1004;Start-Sleep -Milliseconds 160
+ $brightnessKeys=[PreferencesTest]::GetDlgItem($preferences,1400)
+ $keyFeedback=[PreferencesTest]::GetDlgItem($preferences,1403)
+ $testKeys=[PreferencesTest]::GetDlgItem($preferences,1401)
+ if([PreferencesTest]::SendMessage($brightnessKeys,0x00F0,[IntPtr]::Zero,[IntPtr]::Zero).ToInt32() -ne 0){throw 'Brightness keys must be off by default'}
+ if([PreferencesTest]::SendMessage($keyFeedback,0x00F0,[IntPtr]::Zero,[IntPtr]::Zero).ToInt32() -ne 1){throw 'Optional keyboard feedback should initially be on'}
+ Send $testKeys 0x00F5
+ if((Read-Text $testKeys) -ne 'Stop test'){throw 'Brightness-key test did not start'}
+ if([PreferencesTest]::FileText($settingsFile) -notmatch 'brightness=100'){throw 'Key test changed brightness'}
+ Send $window 0x0113 31 # Expire the same one-shot test handler without waiting 15 seconds.
+ if((Read-Text $testKeys) -ne 'Test brightness keys'){throw 'Brightness-key test did not expire'}
+ if((Read-Text ([PreferencesTest]::GetDlgItem($preferences,1402))) -notmatch 'No brightness keys detected'){throw 'Missing compatibility result'}
+ Send $brightnessKeys 0x00F5;Wait-SettingsFile 'brightnessKeys=1'
+ Send $brightnessKeys 0x00F5;Wait-SettingsFile 'brightnessKeys=0'
+ Capture 'settings-keyboard.png'
+ # Fallback shortcuts exercise the same non-activating app-brightness panel.
+ $foreground=[PreferencesTest]::GetForegroundWindow()
+ Send $window 0x0312 2;Wait-SettingsFile 'brightness=95';Start-Sleep -Milliseconds 220
+ if(-not [PreferencesTest]::IsWindowVisible($window)){throw 'Keyboard feedback panel did not appear'}
+ if((Read-Text ([PreferencesTest]::GetDlgItem($window,112))) -ne 'App brightness' -or (Read-Text ([PreferencesTest]::GetDlgItem($window,110))) -notmatch 'Screen Dimmer'){throw 'Keyboard feedback must clearly identify software/app brightness'}
+ if([PreferencesTest]::GetForegroundWindow() -ne $foreground){throw 'Keyboard feedback stole foreground focus'}
+ Capture 'slider-keyboard-feedback.png' $window $true
+ Start-Sleep -Milliseconds 2300
+ if([PreferencesTest]::IsWindowVisible($window)){throw 'Keyboard feedback did not dismiss automatically'}
+ Send $keyFeedback 0x00F5;Wait-SettingsFile 'brightnessKeyFeedback=0'
+ Send $window 0x0312 3;Wait-SettingsFile 'brightness=100';Start-Sleep -Milliseconds 150
+ if([PreferencesTest]::IsWindowVisible($window)){throw 'Disabled keyboard feedback still opened the panel'}
+ Send $keyFeedback 0x00F5;Wait-SettingsFile 'brightnessKeyFeedback=1'
+ Send $window 0x0312 2;Wait-SettingsFile 'brightness=95';Start-Sleep -Milliseconds 180
+ Send $window 0x0021 # Adopting the passive panel keeps it interactive instead of auto-hiding.
+ Send $window 0x0113 32;Start-Sleep -Milliseconds 150
+ if(-not [PreferencesTest]::IsWindowVisible($window)){throw 'Interacting with keyboard feedback did not retain the normal panel'}
+ Send $window 0x0010;Start-Sleep -Milliseconds 150
  Send $preferences 0x0111 1015;Wait-SettingsFile 'brightness=100'
  Send $preferences 0x0111 1002;Start-Sleep -Milliseconds 130
  $step=[PreferencesTest]::GetDlgItem($preferences,1204)

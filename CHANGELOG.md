@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.0 — Beta 1
+
+- Add opt-in support for standard HID keyboard brightness keys, with a 15-second compatibility test and existing Ctrl+Alt+Up/Down fallback.
+- Show a non-activating, auto-dismissing mini panel labeled App brightness for keyboard changes, with an independent feedback switch.
+- Use the selected monitor and current desktop profile for brightness-key adjustments; preserve each device's own hardware handling.
+- Bound held-key repeat, batch settings writes until release, and release the input listener when disabled or a temporary test ends.
+- Add registration/resource, settings/persistence, repeat/bounds, focus-preservation and feedback-dismissal regression checks; compare memory with keyboard listening on and off.
+
 ## 1.1.0 — Alpha 2
 
 - Add opt-in brightness profiles for named Windows virtual desktops, with independent physical-monitor overrides and a shared fallback.
