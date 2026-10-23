@@ -4,6 +4,8 @@
 #include <map>
 #include <string>
 #include <string_view>
+#include <array>
+#include <cstdint>
 
 namespace screen {
 inline constexpr int minBrightness = 8;
@@ -13,6 +15,26 @@ inline constexpr double transitionSeconds = 0.20;
 inline int clampBrightness(int value) noexcept {
     return std::clamp(value, minBrightness, maxBrightness);
 }
+inline constexpr std::array<int,4> pauseLengths{5,15,30,60};
+inline int validPauseMinutes(int value) noexcept {
+    return std::find(pauseLengths.begin(),pauseLengths.end(),value)!=pauseLengths.end()?value:15;
+}
+inline unsigned pauseSecondsLeft(std::uint64_t deadline,std::uint64_t now) noexcept {
+    return now>=deadline?0:static_cast<unsigned>((std::min<std::uint64_t>(3600000,deadline-now)+999)/1000);
+}
+struct InteractionMotion {
+    double value=0,velocity=0,target=0;
+    bool advance(double seconds) noexcept {
+        const auto dt=std::clamp(seconds,0.0,0.1),offset=value-target;
+        constexpr double omega=34;
+        const auto momentum=velocity+omega*offset,decay=std::exp(-omega*dt);
+        value=std::clamp(target+(offset+momentum*dt)*decay,0.0,1.0);
+        velocity=(velocity-omega*momentum*dt)*decay;
+        if(std::abs(value-target)<0.006 && std::abs(velocity)<0.08) { value=target;velocity=0;return false; }
+        return true;
+    }
+    void snap() noexcept { value=target;velocity=0; }
+};
 inline unsigned char opacity(int brightness, bool paused) noexcept {
     if (paused) return 0;
     return static_cast<unsigned char>(std::lround((100 - clampBrightness(brightness)) * 255.0 / 100));
@@ -72,6 +94,9 @@ struct Settings {
     bool brightnessKeys = false; // Optional consumer-HID brightness input; never captures typing.
     bool windowsBrightness = false; // Separate opt-in: follow Windows logical level changes, not key events.
     bool brightnessKeyFeedback = true; // Independent feedback for either opt-in and the fallback shortcuts.
+    std::array<int,4> quickLevels{25,50,75,100};
+    int pauseMinutes=15;
+    bool keepPanelOpen=false;
     bool separateDesktops = false;
     std::wstring activeDesktop; // Runtime context; the shared baseline is never replaced on a switch.
     std::map<std::wstring, BrightnessProfile> desktops;

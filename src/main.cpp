@@ -14,12 +14,15 @@ namespace {
 constexpr wchar_t windowClass[] = L"Shardapps.Screen.Control";
 constexpr UINT trayMessage = WM_APP + 2, showMessage = WM_APP + 3;
 constexpr int sliderId = 101, pauseId = 103, warmId = 104, smoothId = 105,
-              exitId = 107, restoreId = 108, openId = 109, displayPickerId = 110, preferencesId = 111, appBrightnessLabelId = 112, displayBase = 200;
-constexpr int panelWidth = 330, panelHeight = 136;
+              exitId = 107, restoreId = 108, openId = 109, displayPickerId = 110, preferencesId = 111, appBrightnessLabelId = 112,
+              pinId=113,quickBase=120,displayBase = 200;
+constexpr int panelWidth = 330, panelHeight = 184;
 
 
 struct App {
     HWND window{}, slider{}, label{}, value{}, footer{}, shortcut{}, preferencesButton{};
+    HWND pinButton{},pauseButton{};
+    std::array<HWND,4> quickButtons{};
     HFONT regular{}, number{}, footerFont{};
     HBRUSH background{};
     HICON icon{};
@@ -27,6 +30,8 @@ struct App {
     bool trayPresent = false, menuActive = false, animating = false, opening = false, placing = false;
     bool overlayOnly = false, desktopCoverage = true;
     bool timedPause = false;
+    std::uint64_t pauseDeadline=0;
+    bool countdownArmed=false;
     int registeredShortcut = -1;
     double panelAlpha = 255, fromAlpha = 255, toAlpha = 255;
     RECT destination{};
@@ -176,8 +181,7 @@ struct App {
         if (background) DeleteObject(background);
         background = CreateSolidBrush(bg);
         screen::ui::windowTheme(window,colors);
-        InvalidateRect(window, nullptr, TRUE);
-        if (slider) InvalidateRect(slider, nullptr, TRUE);
+        RedrawWindow(window,nullptr,nullptr,RDW_INVALIDATE|RDW_ALLCHILDREN);
     }
     void fonts() {
         const auto previous = std::initializer_list<HFONT>{regular, number, footerFont};
@@ -189,20 +193,24 @@ struct App {
         for (auto child : {label, value, footer, shortcut}) if (child)
             SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(child == value ? number :
                 child == label ? regular : footerFont), TRUE);
+        for(auto child:quickButtons) if(child) SendMessageW(child,WM_SETFONT,reinterpret_cast<WPARAM>(footerFont),TRUE);
         for (auto font : previous) if (font) DeleteObject(font);
     }
     HWND control(const wchar_t* type, const wchar_t* text, DWORD style, int id) {
-        return CreateWindowExW(0, type, text, WS_CHILD | WS_VISIBLE | style, 0, 0, 0, 0,
+        const auto result=CreateWindowExW(0, type, text, WS_CHILD | WS_VISIBLE | style, 0, 0, 0, 0,
             window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), GetModuleHandleW(nullptr), nullptr);
+        if(lstrcmpiW(type,L"BUTTON")==0) SetWindowSubclass(result,screen::ui::buttonProcedure,1,0);
+        return result;
     }
     void layout() {
         const auto move = [&](HWND child, int x, int y, int width, int height) {
             SetWindowPos(child, nullptr, px(x), px(y), px(width), px(height), SWP_NOZORDER | SWP_NOACTIVATE);
         };
-        move(label, 49, 22, 180, 23); move(value, 238, 15, 68, 33);
-        move(slider, 18, 57, 294, 34);
-        move(footer, 20, 101, 187, 26); move(shortcut, 211, 105, 67, 18);
-        move(preferencesButton, 287, 101, 26, 26);
+        move(label, 49, 16, 180, 23); move(value, 238, 12, 68, 33);
+        move(shortcut,49,39,257,16);move(slider,18,60,294,34);
+        for(size_t i=0;i<quickButtons.size();++i) move(quickButtons[i],20+static_cast<int>(i)*74,102,68,28);
+        move(footer,20,144,162,26);move(pinButton,188,144,26,26);move(pauseButton,225,144,26,26);
+        move(preferencesButton,287,144,26,26);
         RECT client{}; GetClientRect(window, &client);
         SetWindowRgn(window, CreateRoundRectRgn(0, 0, client.right, client.bottom, px(22), px(22)), TRUE);
     }
@@ -211,8 +219,11 @@ struct App {
         label = control(L"STATIC", L"App brightness", SS_NOPREFIX, appBrightnessLabelId);
         slider = control(TRACKBAR_CLASSW, L"Brightness", TBS_HORZ | TBS_NOTICKS | WS_TABSTOP, sliderId);
         value = control(L"STATIC", L"70%", SS_RIGHT | SS_NOPREFIX, 0);
+        shortcut = control(L"STATIC", shortcutText.c_str(), SS_LEFT | SS_NOPREFIX, 0);
+        for(size_t i=0;i<quickButtons.size();++i) quickButtons[i]=control(L"BUTTON",L"Quick brightness",BS_OWNERDRAW|WS_TABSTOP,quickBase+static_cast<int>(i));
         footer = control(L"BUTTON", L"Paused · All displays", BS_OWNERDRAW | WS_TABSTOP, displayPickerId);
-        shortcut = control(L"STATIC", shortcutText.c_str(), SS_RIGHT | SS_NOPREFIX, 0);
+        pinButton=control(L"BUTTON",L"Keep mini panel open",BS_OWNERDRAW|WS_TABSTOP,pinId);
+        pauseButton=control(L"BUTTON",L"Pause dimming",BS_OWNERDRAW|WS_TABSTOP,pauseId);
         preferencesButton = control(L"BUTTON", L"Settings", BS_OWNERDRAW | WS_TABSTOP, preferencesId);
         SetWindowSubclass(slider, screen::ui::sliderProcedure, 1, 0);
         SendMessageW(slider, TBM_SETRANGE, TRUE, MAKELPARAM(screen::minBrightness, screen::maxBrightness));
@@ -228,11 +239,22 @@ struct App {
         for (size_t i = 0; i < displays.size(); ++i)
             if (displays[i].device == selected) displayName = L"Display " + std::to_wstring(i + 1);
         if (settings.separateDesktops && workspaces && !settings.activeDesktop.empty()) displayName = workspaces->name() + L" · " + displayName;
-        const auto summary = keyFeedback?L"Screen Dimmer · "+displayName:statusText.empty() ? (settings.paused ? L"Paused · " : L"") + displayName +
+        const auto summary = timedPause?L"Paused · "+pauseClock():keyFeedback?L"Screen Dimmer · "+displayName:statusText.empty() ? (settings.paused ? L"Paused · " : L"") + displayName +
             (settings.paused ? L"" : desktopCoverage ? L" · Desktop" : L" · Overlay") : statusText;
         SetWindowTextW(footer, summary.c_str());
-        SetWindowTextW(shortcut, shortcutText.c_str());
+        const auto mode=settings.windowsBrightness?L"Windows-linked":settings.brightnessKeys?L"Keyboard controls":L"Software dimming";
+        SetWindowTextW(shortcut,(std::wstring(mode)+L" · "+shortcutText).c_str());
+        SetWindowTextW(pinButton,settings.keepPanelOpen?L"Unpin mini panel":L"Keep mini panel open");
+        SetWindowTextW(pauseButton,settings.paused?L"Resume dimming":L"Pause dimming");
+        for(size_t i=0;i<quickButtons.size();++i) {
+            const auto text=std::to_wstring(settings.quickLevels[i])+L"%";
+            if(GetWindowTextLengthW(quickButtons[i])!=static_cast<int>(text.size())) SetWindowTextW(quickButtons[i],text.c_str());
+            else {wchar_t old[16]{};GetWindowTextW(quickButtons[i],old,16);if(text!=old) SetWindowTextW(quickButtons[i],text.c_str());}
+            InvalidateRect(quickButtons[i],nullptr,FALSE);
+        }
+        InvalidateRect(pinButton,nullptr,FALSE);InvalidateRect(pauseButton,nullptr,FALSE);
         if (preferences) preferences->refresh();
+        countdownVisibility();
         if (trayPresent && !tracking) {
             NOTIFYICONDATAW data{sizeof(data)}; data.hWnd = window; data.uID = 1; data.uFlags = NIF_TIP;
             auto tip = settings.paused ? std::wstring(L"Screen Dimmer by Shardapps · Paused") :
@@ -321,8 +343,9 @@ struct App {
         refreshWorkspace();
         place();sync();
         if (!IsWindowVisible(window)) { panelAlpha = 0; SetLayeredWindowAttributes(window, 0, 0, LWA_ALPHA); }
-        ShowWindow(window, SW_SHOWNOACTIVATE); animate(true);
+        SetWindowPos(window,HWND_TOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE|SWP_SHOWWINDOW);animate(true);
         SetForegroundWindow(window); SetFocus(slider);
+        countdownVisibility();
     }
     void showKeyFeedback() {
         if(!settings.brightnessKeyFeedback) return;
@@ -343,6 +366,7 @@ struct App {
         if (!IsWindowVisible(window) && !animating) return;
         if (trayPresent || addTray()) animate(false);
         else { statusText = L"Tray unavailable"; sync(); }
+        if(!preferences || !IsWindowVisible(preferences->window())) {KillTimer(window,34);countdownArmed=false;}
     }
     void restore() {
         stopKeyTest();
@@ -357,11 +381,33 @@ struct App {
             [&](const auto& display) { return display.device == selected; })) { selected.clear(); settings.selectedDisplay.clear(); }
         if (preferences) preferences->refresh(true);
     }
-    void cancelTimedPause() { KillTimer(window, 20); timedPause = false; }
-    void pauseFor15Minutes() {
+    std::wstring pauseClock() const {
+        const auto seconds=screen::pauseSecondsLeft(pauseDeadline,GetTickCount64());
+        const auto remainder=seconds%60;
+        return std::to_wstring(seconds/60)+L":"+(remainder<10?L"0":L"")+std::to_wstring(remainder);
+    }
+    void countdownVisibility() {
+        const bool visible=(IsWindowVisible(window) && !IsIconic(window)) ||
+            (preferences && IsWindowVisible(preferences->window()) && !IsIconic(preferences->window()));
+        if(timedPause && visible) {
+            if(!countdownArmed) countdownArmed=SetTimer(window,34,1000,nullptr)!=0;
+            if(preferences) preferences->pauseStatus(L"Resumes in "+pauseClock());
+        } else {
+            KillTimer(window,34);countdownArmed=false;
+            if(preferences) preferences->pauseStatus(L"Returns to your current level.");
+        }
+    }
+    void countdownTick() {
+        countdownVisibility();
+        if(timedPause && IsWindowVisible(window)) SetWindowTextW(footer,(L"Paused · "+pauseClock()).c_str());
+    }
+    void cancelTimedPause() { KillTimer(window,20);KillTimer(window,34);countdownArmed=false;timedPause=false;pauseDeadline=0; }
+    void pauseForMinutes() {
         clearHeldKeys();
-        settings.paused = true; statusText = L"Paused for 15 minutes";
-        timedPause = SetTimer(window, 20, 15 * 60 * 1000, nullptr) != 0;
+        settings.paused = true;statusText.clear();
+        const auto duration=static_cast<UINT>(screen::validPauseMinutes(settings.pauseMinutes)*60*1000);
+        pauseDeadline=GetTickCount64()+duration;
+        timedPause = SetTimer(window,20,duration,nullptr)!=0;
         if (!timedPause) statusText = L"Paused · timer unavailable";
         apply(false);
     }
@@ -384,6 +430,7 @@ struct App {
         preferences->startupState(startupState, true);
         keyStatus();
         startup.request(window);
+        countdownVisibility();
     }
     void preference(screen::PreferenceAction action, int amount) {
         using enum screen::PreferenceAction;
@@ -395,6 +442,11 @@ struct App {
             const bool tracking = (amount & 0x10000) != 0;
             setBrightness(amount & 0xFFFF); apply(!tracking, false, tracking); return;
         }
+        case savePreset:
+            if(amount>=0 && amount<4) settings.quickLevels[static_cast<size_t>(amount)]=this->brightness();
+            break;
+        case pauseLength: settings.pauseMinutes=screen::validPauseMinutes(amount);break;
+        case keepPanelOpen: settings.keepPanelOpen=amount!=0;break;
         case theme: settings.theme = std::clamp(amount, 0, 6); this->theme(); break;
         case warm: settings.warm = amount != 0; break;
         case smooth: settings.smooth = amount != 0; break;
@@ -445,7 +497,7 @@ struct App {
             if (this->startup.request(window, amount != 0)) preferences->startupState(startupState, true);
             return;
         case pause: clearHeldKeys();cancelTimedPause(); settings.paused = !settings.paused; statusText.clear(); break;
-        case timedPause: pauseFor15Minutes(); return;
+        case timedPause: pauseForMinutes(); return;
         case restore: this->restore(); return;
         }
         apply();
@@ -488,7 +540,7 @@ struct App {
         DestroyMenu(popup); menuActive = false;
         PostMessageW(window, WM_NULL, 0, 0);
         if (command) SendMessageW(window, WM_COMMAND, command, 0);
-        else if (IsWindowVisible(window) && GetForegroundWindow() != window) hide();
+        else if (IsWindowVisible(window) && GetForegroundWindow() != window && !settings.keepPanelOpen) hide();
     }
     void paint() {
         PAINTSTRUCT ps{}; const auto dc = BeginPaint(window, &ps);
@@ -504,6 +556,7 @@ struct App {
                 px(31) + static_cast<int>(std::lround(px(12) * std::sin(angle))));
         }
         SelectObject(dc, previousPen); SelectObject(dc, previousBrush); DeleteObject(pen);
+        screen::ui::roundFill(dc,{px(20),px(137),px(310),px(138)},0,screen::ui::blend(bg,border,0.6));
         EndPaint(window, &ps);
     }
     void renderSlider(HDC target) {
@@ -511,8 +564,18 @@ struct App {
     }
     void drawButton(const DRAWITEMSTRUCT& draw) {
         const auto dc = draw.hDC; auto rect = draw.rcItem; FillRect(dc, &rect, background);
+        const auto hot=screen::ui::interactionAmount(draw.hwndItem);
+        if(hot>0 && !colors.highContrast) screen::ui::roundFill(dc,rect,px(9),screen::ui::blend(bg,accent,0.10*hot));
         const auto previousFont = SelectObject(dc, footerFont);
-        if (draw.CtlID == displayPickerId) {
+        if(draw.CtlID>=quickBase && draw.CtlID<quickBase+4) {
+            const auto index=static_cast<size_t>(draw.CtlID-quickBase);
+            const bool active=!settings.paused && brightness()==settings.quickLevels[index];
+            const auto fill=colors.highContrast?bg:screen::ui::blend(bg,active?accent:fg,active?0.18:0.045+0.045*hot);
+            screen::ui::roundFill(dc,rect,px(12),active?screen::ui::blend(border,accent,0.60):screen::ui::blend(border,accent,0.3*hot));
+            InflateRect(&rect,-px(1),-px(1));screen::ui::roundFill(dc,rect,px(10),fill);
+            wchar_t text[20]{};GetWindowTextW(draw.hwndItem,text,20);
+            screen::ui::text(dc,rect,text,active?accent:fg,DT_CENTER|DT_VCENTER|DT_SINGLELINE);
+        } else if (draw.CtlID == displayPickerId) {
             wchar_t text[160]{}; GetWindowTextW(footer, text, 160);
             rect.left += px(4); rect.right -= px(13);
             screen::ui::text(dc, rect, text, muted, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
@@ -520,6 +583,20 @@ struct App {
             const auto x = draw.rcItem.right-px(8), y = draw.rcItem.bottom/2;
             MoveToEx(dc,x-px(3),y-px(1),nullptr); LineTo(dc,x,y+px(2)); LineTo(dc,x+px(3),y-px(1));
             SelectObject(dc,previous); DeleteObject(pen);
+        } else if(draw.CtlID==pinId || draw.CtlID==pauseId) {
+            const auto color=draw.CtlID==pinId && settings.keepPanelOpen?accent:muted;
+            const auto pen=CreatePen(PS_SOLID,px(2),color);const auto oldPen=SelectObject(dc,pen);
+            const auto brush=SelectObject(dc,GetStockObject(NULL_BRUSH));
+            if(draw.CtlID==pinId) {
+                POINT points[]={{px(9),px(6)},{px(17),px(6)},{px(16),px(12)},{px(19),px(15)},{px(7),px(15)},{px(10),px(12)}};
+                Polygon(dc,points,6);MoveToEx(dc,px(13),px(15),nullptr);LineTo(dc,px(13),px(22));
+            } else if(settings.paused) {
+                POINT points[]={{px(9),px(6)},{px(19),px(13)},{px(9),px(20)}};Polygon(dc,points,3);
+            } else {
+                MoveToEx(dc,px(9),px(6),nullptr);LineTo(dc,px(9),px(20));
+                MoveToEx(dc,px(17),px(6),nullptr);LineTo(dc,px(17),px(20));
+            }
+            SelectObject(dc,brush);SelectObject(dc,oldPen);DeleteObject(pen);
         } else {
             const auto pen = CreatePen(PS_SOLID, px(2), (draw.itemState & ODS_SELECTED) ? accent : muted);
             const auto previous = SelectObject(dc,pen);
@@ -580,6 +657,9 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
         }
         break;
     case screen::ui::printSlider: app->renderSlider(reinterpret_cast<HDC>(wParam)); return 0;
+    case screen::ui::motionAllowed: return app->settings.smooth && !app->colors.highContrast;
+    case screen::ui::visibilityChanged: app->countdownVisibility();return 0;
+    case WM_SIZE: app->countdownVisibility();return 0;
     case WM_DRAWITEM: app->drawButton(*reinterpret_cast<DRAWITEMSTRUCT*>(lParam)); return TRUE;
     case WM_COMMAND: {
         const auto command = LOWORD(wParam);
@@ -587,8 +667,12 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
         else if (command == openId) app->show();
         else if (command == preferencesId) app->openPreferences();
         else if (command == displayPickerId) app->displayMenu();
+        else if(command>=quickBase && command<quickBase+4) {
+            app->adoptKeyFeedback();app->setBrightness(app->settings.quickLevels[static_cast<size_t>(command-quickBase)]);app->apply();
+        }
+        else if(command==pinId) {app->adoptKeyFeedback();app->settings.keepPanelOpen=!app->settings.keepPanelOpen;app->apply();}
         else if (command == IDCANCEL) app->hide();
-        else if (command == pauseId) { app->cancelTimedPause(); app->settings.paused = !app->settings.paused; app->statusText.clear(); app->apply(); }
+        else if (command == pauseId) { app->clearHeldKeys();app->cancelTimedPause(); app->settings.paused = !app->settings.paused; app->statusText.clear(); app->apply(); }
         else if (command == restoreId) app->restore();
         else if (command == warmId) { app->settings.warm = !app->settings.warm; app->apply(); }
         else if (command == smoothId) { app->settings.smooth = !app->settings.smooth; app->apply(); }
@@ -617,6 +701,7 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
     case screen::virtualDesktopsChanged: app->refreshWorkspace(wParam != 0); return 0;
     case screen::preferencesClosed:
         app->stopKeyTest();
+        app->countdownVisibility();
         app->workspaceTracking(); if(app->engine) app->engine->submit(app->settings); return 0;
     case WM_INPUT:
         app->keyInput(reinterpret_cast<HRAWINPUT>(lParam));
@@ -637,7 +722,7 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
         return TRUE;
     case WM_CONTEXTMENU: app->menu(); return 0;
     case WM_ACTIVATE:
-        if (LOWORD(wParam) == WA_INACTIVE && !app->keyFeedback && !app->menuActive && IsWindowVisible(window)) app->hide();
+        if (LOWORD(wParam) == WA_INACTIVE && !app->keyFeedback && !app->menuActive && !app->settings.keepPanelOpen && IsWindowVisible(window)) app->hide();
         return 0;
     case WM_MOUSEACTIVATE:
         if(app->keyFeedback) app->adoptKeyFeedback();
@@ -653,6 +738,7 @@ LRESULT CALLBACK windowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
             const auto observed=app->observedKeys;app->stopKeyTest();
             if(!observed && !app->settings.windowsBrightness && app->preferences) app->preferences->brightnessKeyStatus(L"No brightness keys detected. Try compatibility mode for Windows brightness changes, or Ctrl + Alt + Up / Down.",false);
         } else if(wParam==33) { app->clearHeldKeys(); }
+        else if(wParam==34) { app->countdownTick(); }
         else if(wParam==32) {
             if(!app->keyFeedback) { KillTimer(window,32);return 0; }
             POINT pointer{};GetCursorPos(&pointer);const auto target=WindowFromPoint(pointer);

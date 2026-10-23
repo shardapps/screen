@@ -33,10 +33,12 @@ Screen by **Shardapps** dims Windows desktop output using a full-desktop color t
 | Native and small | C++20, Win32, and the Windows compositor. No bundled browser or managed runtime. |
 | Multi-monitor dimming | Adjust all displays together or select one display. Monitor geometry refreshes when Windows reports a display change. |
 | Windows desktop profiles | Opt in under Settings → Desktops. Detect named Task View desktops, save a brightness for each, and keep separate monitor levels inside each profile. |
-| Compact flyout | A 330 × 136 panel above the bottom-right taskbar. Open with Alt+S, adjust the slider, then click outside or press Escape. |
+| Compact flyout | A 330 × 184 panel above the bottom-right taskbar, with saved quick levels, pause/resume and a pin button. Alt+S opens it; Escape always dismisses it. |
 | Smooth transitions | Velocity-preserving fades keep moving through rapid slider updates. Short panel transitions respect Windows' animation preference. |
 | Six palettes + System | Pearl, Midnight, Graphite, Ocean, Forest and Sunset, shared by the flyout and settings. Windows high contrast takes priority. |
-| Proper settings | A screen picker, identify screens, brightness presets, a 15-minute pause, and configurable shortcut/adjustment step. |
+| Quick controls | Four saved brightness levels shared by the flyout and settings. Save your current screen level to a slot with **Displays → Save current level to a quick preset**. |
+| Flexible pause | Choose 5, 15, 30 or 60 minutes and see the remaining time while controls are visible. The countdown stops refreshing when hidden; dimming still resumes on time. |
+| Proper settings | A screen picker, identify screens, keyboard input modes, and configurable shortcut/adjustment step. |
 | Start with Windows | Opt in to quiet tray startup; separately choose whether to resume saved dimming. |
 | Optional warm tint | Add a subtle warm color while dimming. This changes displayed colors. |
 | Background controls | Close to the system tray; reopen, pause, restore, or quit from its menu. |
@@ -50,7 +52,7 @@ Screen by **Shardapps** dims Windows desktop output using a full-desktop color t
 
 <img src="docs/assets/screenshot.png" alt="Actual compact Windows 11 brightness flyout with a percentage and Alt+S shortcut" width="380" />
 
-The compact flyout at 150% display scaling. The hero above is an interface illustration.
+Earlier compact flyout at 150% display scaling. The 1.3 source adds quick controls; refreshed captures are part of beta review. The hero above is an interface illustration.
 
 <img src="docs/assets/settings-themes.png" alt="Screen settings with six Windows brightness app themes and a System palette" width="500" />
 
@@ -60,6 +62,8 @@ The compact flyout at 150% display scaling. The hero above is an interface illus
 </details>
 
 ## Get started
+
+The unreleased 1.3.0 polish pass adds [saved quick levels, pinning and flexible pauses](docs/QUICK_CONTROLS.md). Public beta downloads remain withdrawn while the new candidate is reviewed.
 
 1. Open a successful [Windows CI run](https://github.com/shardapps/screen/actions/workflows/ci.yml). GitHub requires sign-in to download workflow artifacts.
 2. Download `Screen-preview-x64` for an Intel/AMD PC, or `Screen-preview-arm64` for Windows on Arm, and extract the artifact ZIP.

@@ -16,6 +16,7 @@ public static class PreferencesTest {
  [DllImport("user32.dll",CharSet=CharSet.Unicode)]public static extern int GetClassName(IntPtr hwnd,StringBuilder text,int count);
  [DllImport("user32.dll")]public static extern bool EnumWindows(EnumProc callback,IntPtr data);
  [DllImport("user32.dll")]public static extern bool GetWindowRect(IntPtr hwnd,out Rect rect);
+ [DllImport("user32.dll",EntryPoint="GetWindowLongW")]public static extern int GetWindowLong(IntPtr hwnd,int index);
  [DllImport("user32.dll")]public static extern bool IsWindowVisible(IntPtr hwnd);
  [DllImport("user32.dll")]public static extern bool ShowWindow(IntPtr hwnd,int command);
  [DllImport("user32.dll")]public static extern bool IsWindow(IntPtr hwnd);
@@ -182,6 +183,7 @@ try{
  if([PreferencesTest]::SendMessage($display,0x0146,[IntPtr]::Zero,[IntPtr]::Zero).ToInt64() -lt 2){throw 'Display picker did not enumerate screens'}
  Assert-PickerFirstPaint
  Capture 'settings-displays.png'
+ if($StoreScreenshots -and ([PreferencesTest]::GetWindowLong($preferences,-16) -band 0x00200000)){throw 'Displays unnecessarily scrolls at the standard 150% capture size'}
  Send $display 0x014E 1;Send $preferences 0x0111 (1010 -bor (1 -shl 16)) $display
  Start-Sleep -Milliseconds 100
  if(-not (([PreferencesTest]::FileText($settingsFile) -split "`r?`n") -match '^selected=.+')){throw 'Selected screen did not persist'}
@@ -189,12 +191,33 @@ try{
  Wait-SettingsFile 'selected='
  # Presets and step preferences drive the same renderer model as the mini slider.
  Send $preferences 0x0111 1022;Wait-SettingsFile 'brightness=75'
+ $level=[PreferencesTest]::GetDlgItem($preferences,1011)
+ Send $level 0x0405 1 43;Send $preferences 0x0114 8 $level;Wait-SettingsFile 'brightness=43'
+ Send $preferences 0x0111 1030;Wait-SettingsFile 'quick0=43'
+ if((Read-Text ([PreferencesTest]::GetDlgItem($window,120))) -ne '43%'){throw 'Custom quick level did not update the flyout'}
+ Send $window 0x0111 121;Wait-SettingsFile 'brightness=50'
+ Send $window 0x0111 120;Wait-SettingsFile 'brightness=43'
+ $pauseLength=[PreferencesTest]::GetDlgItem($preferences,1017)
+ Send $pauseLength 0x014E 2;Send $preferences 0x0111 (1017 -bor (1 -shl 16)) $pauseLength;Wait-SettingsFile 'pauseMinutes=30'
  Send $preferences 0x0111 1014;Start-Sleep -Milliseconds 100
  if((Read-Text ([PreferencesTest]::GetDlgItem($preferences,1013))) -ne 'Resume dimming'){throw 'Timed pause did not pause'}
+ if((Read-Text ([PreferencesTest]::GetDlgItem($preferences,1025))) -notmatch 'Resumes in \d{1,2}:\d{2}'){throw 'Visible pause countdown missing'}
  Send $window 0x0113 20;Start-Sleep -Milliseconds 100
  if((Read-Text ([PreferencesTest]::GetDlgItem($preferences,1013))) -ne 'Pause dimming'){throw 'Timed pause did not resume'}
  Send $preferences 0x0111 1015
  Wait-SettingsFile 'brightness=100';Wait-SettingsFile 'smooth=1'
+ # Pinning applies only to an interactive panel; Escape/Close always dismisses it.
+ Send $window 0x0312 5;Start-Sleep -Milliseconds 220
+ if(-not [PreferencesTest]::IsWindowVisible($window)){throw 'The first manual flyout after quiet startup did not show'}
+ Send $window 0x0111 113;Wait-SettingsFile 'keepPanelOpen=1'
+ Send $window 0x0006;Start-Sleep -Milliseconds 180
+ if(-not [PreferencesTest]::IsWindowVisible($window)){throw 'Pinned flyout closed on focus loss'}
+ Capture 'slider-quick-controls.png' $window $true
+ Send $window 0x0010;Start-Sleep -Milliseconds 200
+ if([PreferencesTest]::IsWindowVisible($window)){throw 'Explicit Close must dismiss a pinned panel'}
+ Send $window 0x0312 5;Send $window 0x0111 113;Wait-SettingsFile 'keepPanelOpen=0'
+ Send $window 0x0006;Start-Sleep -Milliseconds 200
+ if([PreferencesTest]::IsWindowVisible($window)){throw 'Unpinned flyout did not dismiss on focus loss'}
  # Every theme persists and exposes a selected accessible button name.
  Send $preferences 0x0111 1001;Start-Sleep -Milliseconds 130
  foreach($theme in 0..6){
@@ -254,6 +277,7 @@ try{
  Send $brightnessKeys 0x00F5;Wait-SettingsFile 'brightnessKeys=0'
  Capture 'settings-keyboard.png'
  # Fallback shortcuts exercise the same non-activating app-brightness panel.
+ Send $window 0x0111 113;Wait-SettingsFile 'keepPanelOpen=1'
  $foreground=[PreferencesTest]::GetForegroundWindow()
  Send $window 0x0312 2;Wait-SettingsFile 'brightness=95';Start-Sleep -Milliseconds 220
  if(-not [PreferencesTest]::IsWindowVisible($window)){throw 'Keyboard feedback panel did not appear'}
@@ -262,6 +286,7 @@ try{
  Capture 'slider-keyboard-feedback.png' $window $true
  Start-Sleep -Milliseconds 2300
  if([PreferencesTest]::IsWindowVisible($window)){throw 'Keyboard feedback did not dismiss automatically'}
+ Send $window 0x0111 113;Wait-SettingsFile 'keepPanelOpen=0'
  Send $keyFeedback 0x00F5;Wait-SettingsFile 'brightnessKeyFeedback=0'
  Send $window 0x0312 3;Wait-SettingsFile 'brightness=100';Start-Sleep -Milliseconds 150
  if([PreferencesTest]::IsWindowVisible($window)){throw 'Disabled keyboard feedback still opened the panel'}
@@ -288,6 +313,7 @@ try{
  for($attempt=0;$attempt -lt 60 -and (Read-Run) -ne $expected;$attempt++){Start-Sleep -Milliseconds 50}
  if((Read-Run) -ne $expected){throw 'Startup registration did not quote the executable and use background arguments'}
  Capture 'settings-preferences.png'
+ if($StoreScreenshots -and ([PreferencesTest]::GetWindowLong($preferences,-16) -band 0x00200000)){throw 'Preferences unnecessarily scrolls at the standard 150% capture size'}
  Send $startup 0x00F5
  for($attempt=0;$attempt -lt 60 -and $null -ne (Read-Run);$attempt++){Start-Sleep -Milliseconds 50}
  if($null -ne (Read-Run)){throw 'Disabling startup did not remove registration'}
@@ -315,6 +341,7 @@ try{
  Quit-Screen
  Start-Screen $false;Isolate-Overlays
  Open-Settings
+ if((Read-Text ([PreferencesTest]::GetDlgItem($window,120))) -ne '43%' -or [PreferencesTest]::FileText($settingsFile) -notmatch 'pauseMinutes=30'){throw 'Quick controls did not survive restart'}
  if((Read-Text ([PreferencesTest]::GetDlgItem($preferences,1013))) -ne 'Pause dimming'){throw 'Opt-in resume was not applied'}
  Send $preferences 0x0111 1001
  if((Read-Text ([PreferencesTest]::GetDlgItem($preferences,1102))) -notmatch 'selected'){throw 'Theme did not survive restart'}
@@ -336,7 +363,7 @@ try{
  if(-not $cleanup.WaitForExit(5000) -or $cleanup.ExitCode -ne 0 -or (Read-Run) -ne $otherCommand){throw 'Cleanup changed a different copy startup entry'}
  $helper=Join-Path (Split-Path -Parent $binary) 'ScreenStartup.exe'
  if(Test-Path -LiteralPath $helper){
-  [IO.File]::WriteAllText($settingsFile,"brightness=70`nresume=0`n")
+  [IO.File]::WriteAllText($settingsFile,"brightness=70`nresume=0`nkeepPanelOpen=1`n")
   $launcher=Start-Process -FilePath $helper -WindowStyle Hidden -PassThru
   if(-not $launcher.WaitForExit(5000) -or $launcher.ExitCode -ne 0){throw 'Startup helper failed'}
   $window=[IntPtr]::Zero

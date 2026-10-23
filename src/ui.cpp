@@ -1,25 +1,79 @@
 #include "ui.hpp"
+#include "core.hpp"
 #include <dwmapi.h>
 #include <algorithm>
 #include <string>
+#include <new>
 namespace screen::ui {
+namespace {
+constexpr UINT_PTR hoverTimer=0x5343;
+struct Interaction { screen::InteractionMotion motion; ULONGLONG last=0; bool hot=false,focus=false; };
+bool interaction(HWND window,UINT message,WPARAM wp,LPARAM lp,SUBCLASSPROC procedure,DWORD_PTR raw) {
+    auto* state=reinterpret_cast<Interaction*>(raw);
+    if(message==WM_NCDESTROY) { KillTimer(window,hoverTimer);RemoveWindowSubclass(window,procedure,1);delete state;return false; }
+    if(message==WM_TIMER && wp==hoverTimer) {
+        if(!state) { KillTimer(window,hoverTimer);return true; }
+        const auto now=GetTickCount64();
+        bool moving=false;
+        if(!IsWindowVisible(window) || !SendMessageW(GetParent(window),motionAllowed,0,0)) state->motion.snap();
+        else moving=state->motion.advance(static_cast<double>(now-state->last)/1000.0);
+        state->last=now;InvalidateRect(window,nullptr,FALSE);
+        if(!moving) KillTimer(window,hoverTimer);
+        return true;
+    }
+    if(message!=WM_MOUSEMOVE && message!=WM_MOUSELEAVE && message!=WM_SETFOCUS && message!=WM_KILLFOCUS &&
+        message!=WM_ENABLE && message!=WM_SHOWWINDOW && message!=WM_CANCELMODE) return false;
+    if(!state && (message==WM_MOUSEMOVE || message==WM_SETFOCUS)) {
+        state=new(std::nothrow) Interaction;
+        if(state && !SetWindowSubclass(window,procedure,1,reinterpret_cast<DWORD_PTR>(state))) {delete state;state=nullptr;}
+    }
+    if(!state) return false;
+    if(message==WM_MOUSEMOVE && !state->hot) {
+        state->hot=true;TRACKMOUSEEVENT track{sizeof(track),TME_LEAVE,window,0};TrackMouseEvent(&track);
+    }
+    if(message==WM_MOUSELEAVE) state->hot=false;
+    if(message==WM_SETFOCUS) state->focus=true;
+    if(message==WM_KILLFOCUS) state->focus=false;
+    const bool hidden=message==WM_SHOWWINDOW && !wp;
+    if(hidden || message==WM_CANCELMODE) state->hot=state->focus=false;
+    const auto target=IsWindowEnabled(window) && !hidden?(state->hot?1.0:state->focus?0.55:0.0):0.0;
+    if(target==state->motion.target && !hidden && message!=WM_CANCELMODE) return false;
+    state->motion.target=target;
+    BOOL allowed=TRUE;SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION,0,&allowed,0);
+    if(!allowed || !SendMessageW(GetParent(window),motionAllowed,0,0) || hidden || message==WM_CANCELMODE) {
+        state->motion.snap();KillTimer(window,hoverTimer);
+    } else {
+        state->last=GetTickCount64();
+        if(!SetTimer(window,hoverTimer,15,nullptr)) state->motion.snap();
+    }
+    InvalidateRect(window,nullptr,FALSE);(void)lp;return false;
+}
+}
+double interactionAmount(HWND window) {
+    DWORD_PTR value=0;
+    for(auto procedure:{buttonProcedure,sliderProcedure,comboProcedure})
+        if(GetWindowSubclass(window,procedure,1,&value) && value) return reinterpret_cast<Interaction*>(value)->motion.value;
+    return 0;
+}
 Palette palette(int theme) {
     HIGHCONTRASTW contrast{sizeof(contrast)};
     SystemParametersInfoW(SPI_GETHIGHCONTRAST, sizeof(contrast), &contrast, 0);
     if (contrast.dwFlags & HCF_HIGHCONTRASTON)
         return {GetSysColor(COLOR_WINDOW), GetSysColor(COLOR_WINDOWTEXT), GetSysColor(COLOR_WINDOWTEXT),
             GetSysColor(COLOR_HIGHLIGHT), GetSysColor(COLOR_GRAYTEXT), GetSysColor(COLOR_WINDOWTEXT), false, true};
-    DWORD light = 1, size = sizeof(light);
-    RegGetValueW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
-        L"AppsUseLightTheme", RRF_RT_REG_DWORD, nullptr, &light, &size);
-    if (!theme) theme = light ? 1 : 2;
+    if(!theme) {
+        DWORD light=1,size=sizeof(light);
+        RegGetValueW(HKEY_CURRENT_USER,L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+            L"AppsUseLightTheme",RRF_RT_REG_DWORD,nullptr,&light,&size);
+        theme=light?1:2;
+    }
     switch (theme) {
-    case 1: return {RGB(247,248,252), RGB(29,34,51), RGB(98,104,120), RGB(106,80,215), RGB(217,220,232), RGB(225,228,237), false};
-    case 3: return {RGB(32,33,36), RGB(242,244,247), RGB(174,181,194), RGB(200,213,234), RGB(66,72,85), RGB(61,65,75), true};
-    case 4: return {RGB(16,28,43), RGB(237,246,255), RGB(167,194,217), RGB(113,206,255), RGB(43,67,93), RGB(45,62,84), true};
-    case 5: return {RGB(18,36,31), RGB(240,250,243), RGB(162,199,179), RGB(140,225,178), RGB(48,79,67), RGB(46,69,59), true};
-    case 6: return {RGB(44,32,36), RGB(255,245,236), RGB(218,181,172), RGB(255,178,143), RGB(91,61,66), RGB(74,51,57), true};
-    default: return {RGB(24,25,31), RGB(243,243,250), RGB(171,174,191), RGB(184,164,255), RGB(56,54,68), RGB(54,51,63), true};
+    case 1: return {RGB(251,252,255),RGB(30,36,52),RGB(94,102,120),RGB(100,76,209),RGB(222,225,236),RGB(229,232,241),false};
+    case 3: return {RGB(29,31,35),RGB(244,246,250),RGB(177,185,200),RGB(202,218,241),RGB(65,71,84),RGB(53,58,69),true};
+    case 4: return {RGB(13,27,41),RGB(237,248,255),RGB(163,195,216),RGB(112,211,247),RGB(39,65,87),RGB(35,53,73),true};
+    case 5: return {RGB(16,32,28),RGB(241,250,245),RGB(164,199,181),RGB(142,223,180),RGB(44,73,61),RGB(37,58,49),true};
+    case 6: return {RGB(39,26,33),RGB(255,246,239),RGB(216,183,178),RGB(251,179,151),RGB(80,53,66),RGB(64,43,54),true};
+    default: return {RGB(21,23,31),RGB(245,245,252),RGB(174,180,200),RGB(188,171,255),RGB(53,54,73),RGB(44,46,62),true};
     }
 }
 COLORREF blend(COLORREF from,COLORREF to,double amount) {
@@ -65,7 +119,7 @@ void drawSlider(HWND slider, HDC target, const Palette& sourceColors, UINT dpi) 
     const auto center = (thumb.left + thumb.right) / 2, y = client.bottom / 2;
     roundFill(dc, {channel.left, y-px(2), channel.right, y+px(3)}, px(5), colors.track);
     if (center > channel.left) roundFill(dc, {channel.left, y-px(2), center, y+px(3)}, px(5), colors.accent);
-    const auto radius = px(GetCapture() == slider ? 9 : 8);
+    const auto radius = px(8)+static_cast<int>(std::lround(px(2)*interactionAmount(slider)));
     const auto thumbBrush = CreateSolidBrush(colors.accent);
     const auto oldBrush = SelectObject(dc, thumbBrush), oldPen = SelectObject(dc, GetStockObject(NULL_PEN));
     Ellipse(dc, center-radius, y-radius, center+radius+1, y+radius+1);
@@ -86,7 +140,8 @@ void drawSlider(HWND slider, HDC target, const Palette& sourceColors, UINT dpi) 
     if (bitmap) DeleteObject(bitmap);
     if (buffer) DeleteDC(buffer);
 }
-LRESULT CALLBACK sliderProcedure(HWND window, UINT message, WPARAM wParam, LPARAM lParam, UINT_PTR, DWORD_PTR) {
+LRESULT CALLBACK sliderProcedure(HWND window, UINT message, WPARAM wParam, LPARAM lParam, UINT_PTR, DWORD_PTR state) {
+    if(interaction(window,message,wParam,lParam,sliderProcedure,state)) return 0;
     if (message == WM_ERASEBKGND) return 1;
     if (message == WM_PAINT) InvalidateRect(window, nullptr, FALSE);
     if (message == WM_PRINTCLIENT) return SendMessageW(GetParent(window), printSlider, wParam, reinterpret_cast<LPARAM>(window));
@@ -94,7 +149,6 @@ LRESULT CALLBACK sliderProcedure(HWND window, UINT message, WPARAM wParam, LPARA
     if (message == WM_CONTEXTMENU) return SendMessageW(GetParent(window), message, wParam, lParam);
     if (message == WM_LBUTTONDOWN) SendMessageW(window, WM_UPDATEUISTATE, MAKEWPARAM(UIS_SET, UISF_HIDEFOCUS), 0);
     if (message == WM_KEYDOWN) SendMessageW(window, WM_UPDATEUISTATE, MAKEWPARAM(UIS_CLEAR, UISF_HIDEFOCUS), 0);
-    if (message == WM_NCDESTROY) RemoveWindowSubclass(window, sliderProcedure, 1);
     const auto result = DefSubclassProc(window, message, wParam, lParam);
     switch (message) {
     case WM_MOUSEMOVE:
@@ -114,7 +168,7 @@ void drawCombo(HWND combo,HDC target,const Palette& colors,UINT dpi) {
     const auto dc=buffer && bitmap?buffer:target;const auto oldBitmap=buffer && bitmap?SelectObject(dc,bitmap):nullptr;
     const auto background=CreateSolidBrush(colors.bg);FillRect(dc,&rect,background);DeleteObject(background);
     const bool enabled=IsWindowEnabled(combo)!=FALSE,focused=GetFocus()==combo;
-    roundFill(dc,rect,px(14),focused?colors.accent:colors.border);
+    roundFill(dc,rect,px(14),focused?colors.accent:blend(colors.border,colors.accent,0.45*interactionAmount(combo)));
     InflateRect(&rect,-px(1),-px(1));
     roundFill(dc,rect,px(12),colors.highContrast?colors.bg:blend(colors.bg,colors.fg,colors.dark?0.035:0.018));
     const auto index=SendMessageW(combo,CB_GETCURSEL,0,0);
@@ -136,7 +190,8 @@ void drawCombo(HWND combo,HDC target,const Palette& colors,UINT dpi) {
     if(buffer && bitmap) {BitBlt(target,0,0,rect.right+px(1),rect.bottom+px(1),buffer,0,0,SRCCOPY);SelectObject(buffer,oldBitmap);}
     if(bitmap)DeleteObject(bitmap);if(buffer)DeleteDC(buffer);
 }
-LRESULT CALLBACK comboProcedure(HWND window,UINT message,WPARAM wp,LPARAM lp,UINT_PTR,DWORD_PTR hot) {
+LRESULT CALLBACK comboProcedure(HWND window,UINT message,WPARAM wp,LPARAM lp,UINT_PTR,DWORD_PTR state) {
+    if(interaction(window,message,wp,lp,comboProcedure,state)) return 0;
     if(message==WM_ERASEBKGND)return 1;
     if(message==WM_PAINT) {
         PAINTSTRUCT paint{};const auto dc=BeginPaint(window,&paint);
@@ -144,12 +199,7 @@ LRESULT CALLBACK comboProcedure(HWND window,UINT message,WPARAM wp,LPARAM lp,UIN
         EndPaint(window,&paint);return 0;
     }
     if(message==WM_PRINTCLIENT)return SendMessageW(GetParent(window),printCombo,wp,reinterpret_cast<LPARAM>(window));
-    if(message==WM_NCDESTROY)RemoveWindowSubclass(window,comboProcedure,1);
     const auto result=DefSubclassProc(window,message,wp,lp);
-    if(message==WM_MOUSEMOVE && !hot) {
-        SetWindowSubclass(window,comboProcedure,1,1);
-        TRACKMOUSEEVENT track{sizeof(track),TME_LEAVE,window,0};TrackMouseEvent(&track);InvalidateRect(window,nullptr,FALSE);
-    } else if(message==WM_MOUSELEAVE) {SetWindowSubclass(window,comboProcedure,1,0);InvalidateRect(window,nullptr,FALSE);}
     switch(message) {
     case CB_SETCURSEL:case CB_RESETCONTENT:case WM_SETFONT:case WM_ENABLE:case WM_SETFOCUS:case WM_KILLFOCUS:
     case WM_KEYDOWN:case WM_KEYUP:case WM_LBUTTONDOWN:case WM_LBUTTONUP:case WM_UPDATEUISTATE:
@@ -157,12 +207,8 @@ LRESULT CALLBACK comboProcedure(HWND window,UINT message,WPARAM wp,LPARAM lp,UIN
     }
     return result;
 }
-LRESULT CALLBACK buttonProcedure(HWND window,UINT message,WPARAM wp,LPARAM lp,UINT_PTR,DWORD_PTR hot) {
-    if(message==WM_MOUSEMOVE && !hot) {
-        SetWindowSubclass(window,buttonProcedure,1,1);
-        TRACKMOUSEEVENT track{sizeof(track),TME_LEAVE,window,0};TrackMouseEvent(&track);InvalidateRect(window,nullptr,FALSE);
-    } else if(message==WM_MOUSELEAVE) {SetWindowSubclass(window,buttonProcedure,1,0);InvalidateRect(window,nullptr,FALSE);}
-    if(message==WM_NCDESTROY)RemoveWindowSubclass(window,buttonProcedure,1);
+LRESULT CALLBACK buttonProcedure(HWND window,UINT message,WPARAM wp,LPARAM lp,UINT_PTR,DWORD_PTR state) {
+    if(interaction(window,message,wp,lp,buttonProcedure,state)) return 0;
     return DefSubclassProc(window,message,wp,lp);
 }
 }

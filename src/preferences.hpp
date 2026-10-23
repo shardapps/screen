@@ -7,7 +7,8 @@
 
 namespace screen {
 enum class PreferenceAction { display, brightness, theme, warm, smooth, resume, step, shortcut,
-    startup, pause, timedPause, restore, desktopProfiles, desktopBrightness, resetDesktop, brightnessKeys, testBrightnessKeys, brightnessKeyFeedback, windowsBrightness };
+    startup, pause, timedPause, restore, desktopProfiles, desktopBrightness, resetDesktop, brightnessKeys, testBrightnessKeys, brightnessKeyFeedback, windowsBrightness,
+    savePreset,pauseLength,keepPanelOpen };
 class PreferencesWindow {
 public:
     PreferencesWindow(Settings& settings, std::vector<Monitor>& displays, std::wstring& selected,
@@ -17,6 +18,7 @@ public:
     void refresh(bool rebuildDisplays = false);
     void startupState(StartupState state, bool busy);
     void brightnessKeyStatus(const std::wstring& text,bool testing);
+    void pauseStatus(const std::wstring& text);
     HWND window() const { return window_; }
     bool message(MSG& message);
     void close();
@@ -31,8 +33,9 @@ private:
     HWND window_{};
     HWND owner_{};
     HFONT font_{}, titleFont_{}, smallFont_{};
-    HBRUSH background_{};
+    HBRUSH background_{},canvas_{};
     ui::Palette colors_{};
+    std::array<ui::Palette,7> previews_{};
     UINT dpi_ = 96;
     int page_ = 0, scroll_ = 0, animationAlpha_ = 255;
     StartupState startup_ = StartupState::unknown;

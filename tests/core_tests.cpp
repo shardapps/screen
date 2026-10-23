@@ -79,6 +79,19 @@ int main() {
     fade.snap();
     check(fade.value == 120 && fade.velocity == 0, "Emergency / reduced-motion changes must snap immediately");
     Settings settings;
+    check(settings.quickLevels==std::array<int,4>{25,50,75,100} && !settings.keepPanelOpen,"Quick levels must have familiar defaults and pinning must be opt-in");
+    check(validPauseMinutes(5)==5 && validPauseMinutes(60)==60 && validPauseMinutes(-1)==15 && validPauseMinutes(600)==15,"Pause durations must be bounded to supported choices");
+    check(pauseSecondsLeft(10000,0)==10 && pauseSecondsLeft(10000,9001)==1 && pauseSecondsLeft(10000,10000)==0 && pauseSecondsLeft(10000,11000)==0,"Countdown rounds up and ends without unsigned underflow");
+    check(pauseSecondsLeft(UINT64_MAX,0)==3600,"Oversized countdowns cannot overflow or exceed the maximum pause");
+    InteractionMotion hover;
+    hover.target=1;
+    for(int i=0;i<8;++i) hover.advance(1.0/120);
+    const auto moving=hover.value;
+    check(moving>0 && moving<1,"Hover motion must advance without snapping to its target");
+    hover.target=0;
+    for(int i=0;i<120;++i) { hover.advance(1.0/120);check(hover.value>=0 && hover.value<=1,"Rapid interaction reversals stay bounded"); }
+    check(hover.value==0 && !hover.advance(1.0/60),"Settled hover motion must stop requesting frames");
+    hover.target=1;hover.snap();check(hover.value==1 && hover.velocity==0,"Reduced-motion interactions snap without a frame loop");
     WindowsBrightnessState windowsLevel;
     check(!windowsLevel.update(40),"The initial Windows snapshot must not replace saved dimming");
     check(!windowsLevel.update(40),"Duplicate Windows levels must not reopen feedback or write settings");

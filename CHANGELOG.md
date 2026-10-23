@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.0 — Beta polish (unreleased)
+
+- Add four saved quick brightness levels to the mini panel. Save the current level into any slot from Displays settings; presets act on the selected screen/current desktop.
+- Add pin/unpin and pause/resume buttons to the 330 × 184 flyout, with a visible input-mode label and an ordered keyboard focus path. Pinning keeps manual controls open across app switches; passive keyboard feedback still dismisses automatically.
+- Offer 5/15/30/60-minute pauses and a visible countdown. The background pause remains one-shot; countdown refresh stops when both control windows are hidden or minimized.
+- Refine all six theme palettes, add a framed settings surface, animate navigation and hover/focus feedback, and keep native controls and reduced-motion/high-contrast support.
+- Fix the first manual flyout after hidden startup, preserve custom controls across restart, and extend lifecycle/UI regressions.
+- Compare shared and Windows-following idle use against the pinned 1.2.1 source. This pass does not publish a public beta or Store update.
+
 ## 1.2.1 — Compatibility fix (unreleased)
 
 - Add a separate, off-by-default Windows brightness compatibility mode for systems that report brightness changes without delivering HID sun-key reports.

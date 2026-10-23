@@ -7,15 +7,14 @@ namespace screen {
 namespace {
 constexpr auto preferencesClass = L"Shardapps.Screen.Settings";
 constexpr int navBase = 1000, displayId = 1010, levelId = 1011, percentId = 1012,
-    pauseId = 1013, timerId = 1014, restoreId = 1015, identifyId = 1016, coverageId = 1018,
-    presetBase = 1020, themeBase = 1100, warmId = 1200, smoothId = 1201,
+    pauseId = 1013, timerId = 1014, restoreId = 1015, identifyId = 1016, pauseLengthId=1017,coverageId = 1018,savePresetId=1019,
+    presetBase = 1020,pauseStatusId=1025,savePresetBase=1030, themeBase = 1100, warmId = 1200, smoothId = 1201,
     resumeId = 1202, startupId = 1203, stepId = 1204, shortcutId = 1205,
-    systemStartupId = 1206, startupStatusId = 1207,
+    systemStartupId = 1206, startupStatusId = 1207,pinId=1208,
     desktopsEnabledId = 1300, currentDesktopId = 1301, desktopPickerId = 1302,
     desktopLevelId = 1303, desktopPercentId = 1304, resetDesktopId = 1305,
     brightnessKeysId = 1400, testKeysId = 1401, keyStatusId = 1402, keyFeedbackId = 1403, windowsBrightnessId = 1404;
 constexpr int steps[] = {1,2,5,10};
-constexpr int presets[] = {25,50,75,100};
 void setText(HWND window, const std::wstring& value) {
     std::wstring current(static_cast<size_t>(GetWindowTextLengthW(window))+1, L'\0');
     GetWindowTextW(window, current.data(), static_cast<int>(current.size()));
@@ -39,7 +38,7 @@ void PreferencesWindow::show(HWND owner) {
     dpi_ = GetDpiForWindow(owner);
     MONITORINFO info{sizeof(info)}; GetMonitorInfoW(MonitorFromWindow(owner, MONITOR_DEFAULTTONEAREST), &info);
     constexpr DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME | WS_CLIPCHILDREN | WS_VSCROLL;
-    RECT rect{0,0,px(520),px(640)}; AdjustWindowRectExForDpi(&rect, style, FALSE, WS_EX_APPWINDOW, dpi_);
+    RECT rect{0,0,px(600),px(730)}; AdjustWindowRectExForDpi(&rect, style, FALSE, WS_EX_APPWINDOW, dpi_);
     const auto width = std::min<LONG>(rect.right-rect.left, info.rcWork.right-info.rcWork.left);
     const auto height = std::min<LONG>(rect.bottom-rect.top, info.rcWork.bottom-info.rcWork.top);
     window_ = CreateWindowExW(WS_EX_APPWINDOW, preferencesClass, L"Screen Dimmer settings", style,
@@ -78,12 +77,17 @@ void PreferencesWindow::createControls() {
     SetWindowSubclass(slider,ui::sliderProcedure,1,0);
     SendMessageW(slider,TBM_SETRANGE,TRUE,MAKELPARAM(minBrightness,maxBrightness));
     SendMessageW(slider,TBM_SETPAGESIZE,0,5);
-    for (int i=0;i<4;++i) add(L"BUTTON",(std::to_wstring(presets[i])+L"%").c_str(),button,presetBase+i,0,24+i*122,342,106,38);
-    label(L"All displays uses desktop dimming for full-screen coverage. Different screen levels use compatibility overlays.",0,24,398,472,48,coverageId);
-    add(L"BUTTON",L"Pause dimming",button,pauseId,0,24,466,228,40);
-    add(L"BUTTON",L"Pause for 15 minutes",button,timerId,0,268,466,228,40);
-    add(L"BUTTON",L"Restore all displays",button,restoreId,0,24,520,228,40);
-    add(L"BUTTON",L"Identify screens",button,identifyId,0,268,520,228,40);
+    for (int i=0;i<4;++i) add(L"BUTTON",(std::to_wstring(settings_.quickLevels[static_cast<size_t>(i)])+L"%").c_str(),button,presetBase+i,0,24+i*122,342,106,38);
+    add(L"BUTTON",L"Save current level to a quick preset…",button,savePresetId,0,24,390,300,32);
+    label(L"All displays uses desktop dimming for full-screen coverage. Different screen levels use compatibility overlays.",0,24,440,472,48,coverageId);
+    add(L"BUTTON",L"Pause dimming",button,pauseId,0,24,502,228,40);
+    add(L"BUTTON",L"Pause for 15 minutes",button,timerId,0,268,502,228,40);
+    label(L"Next pause",0,24,558,118,24);
+    const auto pauseLength=add(WC_COMBOBOXW,L"Pause length",combo,pauseLengthId,0,148,552,120,180);
+    for(const auto minutes:pauseLengths) { const auto text=std::to_wstring(minutes)+L" minutes";SendMessageW(pauseLength,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(text.c_str())); }
+    label(L"Returns to your current level.",0,284,558,212,40,pauseStatusId);
+    add(L"BUTTON",L"Restore all displays",button,restoreId,0,24,610,228,40);
+    add(L"BUTTON",L"Identify screens",button,identifyId,0,268,610,228,40);
 
     label(L"Make Screen feel like yours",1,24,158,472,24);
     label(L"Choose a palette for the flyout and settings. Windows high contrast always takes priority.",1,24,190,472,40);
@@ -95,19 +99,20 @@ void PreferencesWindow::createControls() {
     add(L"BUTTON",L"Apply saved brightness when Screen opens",BS_AUTOCHECKBOX | WS_TABSTOP,resumeId,2,24,214,472,38);
     add(L"BUTTON",L"Smooth transitions",BS_AUTOCHECKBOX | WS_TABSTOP,smoothId,2,24,268,472,38);
     add(L"BUTTON",L"Warm tint",BS_AUTOCHECKBOX | WS_TABSTOP,warmId,2,24,322,472,38);
-    label(L"Adjustment step",2,24,386,228,24);
-    const auto step = add(WC_COMBOBOXW,L"Adjustment step",combo,stepId,2,24,416,228,150);
+    add(L"BUTTON",L"Keep mini panel open when switching apps",BS_AUTOCHECKBOX | WS_TABSTOP,pinId,2,24,376,472,38);
+    label(L"Adjustment step",2,24,440,228,24);
+    const auto step = add(WC_COMBOBOXW,L"Adjustment step",combo,stepId,2,24,470,228,150);
     for (const auto amount : steps) {
         const auto value = std::to_wstring(amount)+L"%";
         SendMessageW(step,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(value.c_str()));
     }
-    label(L"Open flyout shortcut",2,268,386,228,24);
-    const auto shortcut = add(WC_COMBOBOXW,L"Open flyout shortcut",combo,shortcutId,2,268,416,228,150);
+    label(L"Open flyout shortcut",2,268,440,228,24);
+    const auto shortcut = add(WC_COMBOBOXW,L"Open flyout shortcut",combo,shortcutId,2,268,470,228,150);
     for (const auto value : {L"Alt + S",L"Ctrl + Alt + S",L"Ctrl + Shift + S"})
         SendMessageW(shortcut,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(value));
-    label(L"Checking startup registration…",2,24,478,472,48,startupStatusId);
-    add(L"BUTTON",L"Windows startup settings",button,systemStartupId,2,24,536,272,36);
-    label(L"Emergency restore: Ctrl + Alt + Shift + F12",2,24,590,472,24);
+    label(L"Checking startup registration…",2,24,532,472,48,startupStatusId);
+    add(L"BUTTON",L"Windows startup settings",button,systemStartupId,2,24,590,272,36);
+    label(L"Emergency restore: Ctrl + Alt + Shift + F12",2,24,632,472,24);
 
     add(L"BUTTON",L"Different brightness for each Windows desktop",BS_AUTOCHECKBOX | WS_TABSTOP,desktopsEnabledId,3,24,156,472,38);
     label(L"Desktop detection unavailable",3,24,206,472,44,currentDesktopId);
@@ -140,13 +145,14 @@ void PreferencesWindow::fonts() {
     SendMessageW(GetDlgItem(window_,percentId),WM_SETFONT,reinterpret_cast<WPARAM>(titleFont_),TRUE);
     SendMessageW(GetDlgItem(window_,desktopPercentId),WM_SETFONT,reinterpret_cast<WPARAM>(titleFont_),TRUE);
     for (const auto id : {coverageId,startupStatusId}) SendMessageW(GetDlgItem(window_,id),WM_SETFONT,reinterpret_cast<WPARAM>(smallFont_),TRUE);
-    for (const auto id : {displayId,stepId,shortcutId,desktopPickerId}) {
+    for (const auto id : {displayId,stepId,shortcutId,desktopPickerId,pauseLengthId}) {
         SendMessageW(GetDlgItem(window_,id),CB_SETITEMHEIGHT,static_cast<WPARAM>(-1),px(30));
         SendMessageW(GetDlgItem(window_,id),CB_SETITEMHEIGHT,0,px(28));
     }
 }
 void PreferencesWindow::theme() {
     const auto next = ui::palette(settings_.theme);
+    for(size_t i=0;i<previews_.size();++i) previews_[i]=ui::palette(static_cast<int>(i));
     BOOL allowed=TRUE;SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION,0,&allowed,0);
     const bool motion=settings_.smooth && allowed && !next.highContrast && !colors_.highContrast;
     if(background_ && next==themeTarget_ && appliedTheme_==settings_.theme && (!themeAnimating_ || motion)) return;
@@ -168,6 +174,8 @@ void PreferencesWindow::applyColors(const ui::Palette& colors) {
     colors_=colors;
     if(background_)DeleteObject(background_);
     background_=CreateSolidBrush(colors_.bg);
+    if(canvas_) DeleteObject(canvas_);
+    canvas_=CreateSolidBrush(colors_.highContrast?colors_.bg:ui::blend(colors_.bg,colors_.border,colors_.dark?0.22:0.40));
     RedrawWindow(window_,nullptr,nullptr,RDW_INVALIDATE | RDW_ALLCHILDREN);
 }
 void PreferencesWindow::layout() {
@@ -175,7 +183,7 @@ void PreferencesWindow::layout() {
     layingOut_ = true;
     RECT client{}; GetClientRect(window_,&client);
     const auto height = MulDiv(client.bottom,96,static_cast<int>(dpi_));
-    const int content = page_ == 2 || page_ == 4 ? 638 : 604;
+    const int content = page_==0?662:page_==2?664:page_==4?638:604;
     scroll_ = std::clamp(scroll_,0,std::max(0,content-height));
     SCROLLINFO info{sizeof(info),SIF_RANGE | SIF_PAGE | SIF_POS,0,content-1,static_cast<UINT>(std::max(1,height)),scroll_,0};
     SetScrollInfo(window_,SB_VERT,&info,TRUE); GetClientRect(window_,&client);
@@ -183,12 +191,14 @@ void PreferencesWindow::layout() {
     for (const auto& item : items_) {
         const auto x = 24 + MulDiv(item.x-24,std::max(1,width-48),472);
         const auto itemWidth = MulDiv(item.width,std::max(1,width-48),472);
-        SetWindowPos(item.window,nullptr,px(x),px(item.y-scroll_),px(itemWidth),px(item.height),SWP_NOZORDER | SWP_NOACTIVATE);
+        const int offset=item.page>=0?static_cast<int>(std::lround(5.0*(1-animationAlpha_/255.0))):0;
+        SetWindowPos(item.window,nullptr,px(x),px(item.y-scroll_+offset),px(itemWidth),px(item.height),SWP_NOZORDER | SWP_NOACTIVATE);
         ShowWindow(item.window,item.page == -1 || item.page == page_ ? SW_SHOWNA : SW_HIDE);
     }
     InvalidateRect(window_,nullptr,FALSE); layingOut_ = false;
 }
 void PreferencesWindow::page(int index) {
+    if(page_==std::clamp(index,0,4)) return;
     page_=std::clamp(index,0,4); scroll_=0;
     BOOL allowed=TRUE; SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION,0,&allowed,0);
     animationAlpha_=settings_.smooth && allowed ? 0 : 255;
@@ -204,6 +214,7 @@ void PreferencesWindow::refresh(bool rebuildDisplays) {
     SendDlgItemMessageW(window_,brightnessKeysId,BM_SETCHECK,settings_.brightnessKeys?BST_CHECKED:BST_UNCHECKED,0);
     SendDlgItemMessageW(window_,windowsBrightnessId,BM_SETCHECK,settings_.windowsBrightness?BST_CHECKED:BST_UNCHECKED,0);
     SendDlgItemMessageW(window_,keyFeedbackId,BM_SETCHECK,settings_.brightnessKeyFeedback?BST_CHECKED:BST_UNCHECKED,0);
+    SendDlgItemMessageW(window_,pinId,BM_SETCHECK,settings_.keepPanelOpen?BST_CHECKED:BST_UNCHECKED,0);
     if (appliedTheme_ != settings_.theme || rebuildDisplays) theme();
     const auto combo=GetDlgItem(window_,displayId);
     if (rebuildDisplays) {
@@ -224,6 +235,10 @@ void PreferencesWindow::refresh(bool rebuildDisplays) {
     if (GetCapture()!=slider && SendMessageW(slider,TBM_GETPOS,0,0)!=level) SendMessageW(slider,TBM_SETPOS,TRUE,level);
     setText(GetDlgItem(window_,percentId),std::to_wstring(level)+L"%");
     setText(GetDlgItem(window_,pauseId),settings_.paused?L"Resume dimming":L"Pause dimming");
+    setText(GetDlgItem(window_,timerId),L"Pause for "+std::to_wstring(settings_.pauseMinutes)+L" minutes");
+    for(size_t i=0;i<settings_.quickLevels.size();++i) setText(GetDlgItem(window_,presetBase+static_cast<int>(i)),std::to_wstring(settings_.quickLevels[i])+L"%");
+    const auto duration=std::find(pauseLengths.begin(),pauseLengths.end(),settings_.pauseMinutes)-pauseLengths.begin();
+    if(SendDlgItemMessageW(window_,pauseLengthId,CB_GETCURSEL,0,0)!=duration) SendDlgItemMessageW(window_,pauseLengthId,CB_SETCURSEL,duration,0);
     for (const auto [id,checked] : {std::pair{warmId,settings_.warm}, {smoothId,settings_.smooth}, {resumeId,settings_.resumeOnLaunch}, {startupId,startup_==StartupState::on}}) {
         const auto control=GetDlgItem(window_,id);
         if (SendMessageW(control,BM_GETCHECK,0,0)!=(checked?BST_CHECKED:BST_UNCHECKED)) SendMessageW(control,BM_SETCHECK,checked?BST_CHECKED:BST_UNCHECKED,0);
@@ -290,6 +305,7 @@ void PreferencesWindow::brightnessKeyStatus(const std::wstring& text,bool testin
     setText(GetDlgItem(window_,keyStatusId),text);
     setText(GetDlgItem(window_,testKeysId),testing?L"Stop test":L"Test brightness controls");
 }
+void PreferencesWindow::pauseStatus(const std::wstring& text) { if(window_) setText(GetDlgItem(window_,pauseStatusId),text); }
 void PreferencesWindow::identify() {
     clearIdentifiers();
     identifierFont_=CreateFontW(-px(64),0,0,0,FW_SEMIBOLD,FALSE,FALSE,FALSE,DEFAULT_CHARSET,
@@ -319,6 +335,18 @@ void PreferencesWindow::command(int id,int notification) {
         return;
     }
     if(id>=navBase && id<navBase+5 && notification==BN_CLICKED) { page(id-navBase); return; }
+    if(id>=savePresetBase && id<savePresetBase+4) { action_(PreferenceAction::savePreset,id-savePresetBase);return; }
+    if(id==savePresetId) {
+        const auto menu=CreatePopupMenu();
+        for(int i=0;i<4;++i) { const auto text=L"Slot "+std::to_wstring(i+1)+L" · replace "+std::to_wstring(settings_.quickLevels[static_cast<size_t>(i)])+L"%";AppendMenuW(menu,MF_STRING,savePresetBase+i,text.c_str()); }
+        RECT rect{};GetWindowRect(GetDlgItem(window_,savePresetId),&rect);
+        const auto choice=TrackPopupMenu(menu,TPM_RETURNCMD|TPM_LEFTALIGN,rect.left,rect.bottom,0,window_,nullptr);DestroyMenu(menu);
+        if(choice) PostMessageW(window_,WM_COMMAND,choice,0);return;
+    }
+    if(id==pauseLengthId && notification==CBN_SELCHANGE) {
+        const auto index=SendDlgItemMessageW(window_,id,CB_GETCURSEL,0,0);
+        if(index>=0 && index<4) action_(PreferenceAction::pauseLength,pauseLengths[static_cast<size_t>(index)]);return;
+    }
     if(id==displayId && notification==CBN_SELCHANGE) action_(PreferenceAction::display,static_cast<int>(SendDlgItemMessageW(window_,id,CB_GETCURSEL,0,0)));
     else if(id==desktopPickerId && notification==CBN_SELCHANGE) refreshDesktops(false);
     else if(id==stepId && notification==CBN_SELCHANGE) {
@@ -327,7 +355,7 @@ void PreferencesWindow::command(int id,int notification) {
     } else if(id==shortcutId && notification==CBN_SELCHANGE) action_(PreferenceAction::shortcut,static_cast<int>(SendDlgItemMessageW(window_,id,CB_GETCURSEL,0,0)));
     else if(notification==BN_CLICKED) {
         if(id>=themeBase && id<themeBase+7) action_(PreferenceAction::theme,id-themeBase);
-        else if(id>=presetBase && id<presetBase+4) action_(PreferenceAction::brightness,presets[id-presetBase]);
+        else if(id>=presetBase && id<presetBase+4) action_(PreferenceAction::brightness,settings_.quickLevels[static_cast<size_t>(id-presetBase)]);
         else if(id==pauseId) action_(PreferenceAction::pause,0);
         else if(id==timerId) action_(PreferenceAction::timedPause,0);
         else if(id==restoreId) action_(PreferenceAction::restore,0);
@@ -345,13 +373,15 @@ void PreferencesWindow::command(int id,int notification) {
             if(id==brightnessKeysId) action_(PreferenceAction::brightnessKeys,checked);
             if(id==windowsBrightnessId) action_(PreferenceAction::windowsBrightness,checked);
             if(id==keyFeedbackId) action_(PreferenceAction::brightnessKeyFeedback,checked);
+            if(id==pinId) action_(PreferenceAction::keepPanelOpen,checked);
         }
     }
     refresh();
 }
 void PreferencesWindow::drawButton(const DRAWITEMSTRUCT& draw) {
     const auto dc=draw.hDC; auto rect=draw.rcItem; const int id=static_cast<int>(draw.CtlID);
-    const auto font=SelectObject(dc,font_); FillRect(dc,&rect,background_);
+    const bool nav=id>=navBase && id<navBase+5;
+    const auto font=SelectObject(dc,font_); FillRect(dc,&rect,nav?canvas_:background_);
     if(draw.CtlType==ODT_COMBOBOX) {
         if(draw.itemState & ODS_SELECTED) ui::roundFill(dc,rect,px(4),colors_.track);
         const auto length=SendMessageW(draw.hwndItem,CB_GETLBTEXTLEN,draw.itemID,0);
@@ -361,8 +391,8 @@ void PreferencesWindow::drawButton(const DRAWITEMSTRUCT& draw) {
             value.resize(static_cast<size_t>(length)); rect.left+=px(10); ui::text(dc,rect,value,colors_.fg,DT_LEFT|DT_VCENTER|DT_SINGLELINE|DT_END_ELLIPSIS);
         }
     } else if(id>=themeBase && id<themeBase+7) {
-        const int index=id-themeBase; const auto preview=ui::palette(index);
-        ui::roundFill(dc,rect,px(14),settings_.theme==index?colors_.accent:colors_.border);
+        const int index=id-themeBase; const auto preview=previews_[static_cast<size_t>(index)];
+        ui::roundFill(dc,rect,px(14),settings_.theme==index?colors_.accent:ui::blend(colors_.border,colors_.accent,0.4*ui::interactionAmount(draw.hwndItem)));
         InflateRect(&rect,-px(2),-px(2)); ui::roundFill(dc,rect,px(12),preview.bg);
         auto name=rect; name.left+=px(14);
         if(index!=0) { name.top+=px(8); name.bottom=name.top+px(25); }
@@ -374,21 +404,21 @@ void PreferencesWindow::drawButton(const DRAWITEMSTRUCT& draw) {
         }
         if(settings_.theme==index) ui::roundFill(dc,{rect.right-px(27),rect.top+px(12),rect.right-px(15),rect.top+px(24)},px(12),preview.accent);
     } else {
-        const bool nav=id>=navBase && id<navBase+5;
-        const bool active=nav && id-navBase==page_;
-        POINT pointer{};GetCursorPos(&pointer);const bool hot=WindowFromPoint(pointer)==draw.hwndItem;
+        const auto level=selected_.empty()?settings_.currentBrightness():settings_.forMonitor(selected_);
+        const bool active=(nav && id-navBase==page_) || (id>=presetBase && id<presetBase+4 && !settings_.paused && settings_.quickLevels[static_cast<size_t>(id-presetBase)]==level);
+        const auto hot=ui::interactionAmount(draw.hwndItem);
         const bool pressed=(draw.itemState & ODS_SELECTED)!=0,enabled=IsWindowEnabled(draw.hwndItem)!=FALSE;
         auto fill=ui::blend(colors_.bg,colors_.fg,colors_.dark?0.045:0.035);
         if(nav) fill=colors_.bg;
-        if(hot && enabled) fill=ui::blend(colors_.bg,colors_.fg,0.08);
+        if(enabled) fill=ui::blend(fill,colors_.fg,0.045*hot);
         if(active) fill=ui::blend(colors_.bg,colors_.accent,0.04+0.11*animationAlpha_/255.0);
         if(pressed) fill=ui::blend(colors_.bg,colors_.accent,0.20);
-        if(!nav) {ui::roundFill(dc,rect,px(12),colors_.border);InflateRect(&rect,-px(1),-px(1));}
+        if(!nav) {ui::roundFill(dc,rect,px(12),ui::blend(colors_.border,colors_.accent,0.32*hot));InflateRect(&rect,-px(1),-px(1));}
         ui::roundFill(dc,rect,px(10),colors_.highContrast?colors_.bg:fill);
         auto label=std::wstring(static_cast<size_t>(GetWindowTextLengthW(draw.hwndItem))+1,L'\0');
         GetWindowTextW(draw.hwndItem,label.data(),static_cast<int>(label.size())); label.resize(wcslen(label.c_str()));
         ui::text(dc,rect,label,!enabled?colors_.muted:active?colors_.accent:colors_.fg,DT_CENTER|DT_VCENTER|DT_SINGLELINE);
-        if(active) {const auto center=(rect.left+rect.right)/2;const auto half=px(12)*animationAlpha_/255;
+        if(active && nav) {const auto center=(rect.left+rect.right)/2;const auto half=px(12)*animationAlpha_/255;
             ui::roundFill(dc,{center-half,rect.bottom-px(4),center+half,rect.bottom-px(2)},px(2),colors_.accent);}
     }
     if((draw.itemState & ODS_FOCUS) && !(draw.itemState & ODS_NOFOCUSRECT)) {
@@ -400,12 +430,12 @@ LRESULT PreferencesWindow::customDraw(NMCUSTOMDRAW& draw) {
     if(draw.dwDrawStage!=CDDS_PREPAINT) return CDRF_DODEFAULT;
     const int id=GetDlgCtrlID(draw.hdr.hwndFrom);
     if(id==levelId || id==desktopLevelId) { ui::drawSlider(draw.hdr.hwndFrom,draw.hdc,colors_,dpi_); return CDRF_SKIPDEFAULT; }
-    if((id>=warmId && id<=startupId) || id==desktopsEnabledId || id==brightnessKeysId || id==keyFeedbackId || id==windowsBrightnessId) {
+    if((id>=warmId && id<=startupId) || id==pinId || id==desktopsEnabledId || id==brightnessKeysId || id==keyFeedbackId || id==windowsBrightnessId) {
         const auto dc=draw.hdc; auto rect=draw.rc; FillRect(dc,&rect,background_);
         const bool checked=SendMessageW(draw.hdr.hwndFrom,BM_GETCHECK,0,0)==BST_CHECKED;
         const bool enabled=IsWindowEnabled(draw.hdr.hwndFrom)!=FALSE;
         RECT box{rect.left+px(2),rect.top+px(9),rect.left+px(24),rect.top+px(31)};
-        ui::roundFill(dc,box,px(7),checked?colors_.accent:colors_.border);
+        ui::roundFill(dc,box,px(7),checked?colors_.accent:ui::blend(colors_.border,colors_.accent,0.4*ui::interactionAmount(draw.hdr.hwndFrom)));
         if(checked) {
             const auto pen=CreatePen(PS_SOLID,px(2),colors_.bg); const auto previous=SelectObject(dc,pen);
             MoveToEx(dc,box.left+px(5),box.top+px(11),nullptr); LineTo(dc,box.left+px(9),box.top+px(15)); LineTo(dc,box.left+px(17),box.top+px(7));
@@ -419,12 +449,12 @@ LRESULT PreferencesWindow::customDraw(NMCUSTOMDRAW& draw) {
     return CDRF_DODEFAULT;
 }
 void PreferencesWindow::paint(HDC dc) {
-    RECT rect{}; GetClientRect(window_,&rect); FillRect(dc,&rect,background_);
+    RECT rect{}; GetClientRect(window_,&rect); FillRect(dc,&rect,canvas_);
+    ui::roundFill(dc,{px(12),px(145-scroll_),rect.right-px(12),rect.bottom-px(12)},px(24),colors_.bg);
     const auto previous=SelectObject(dc,titleFont_);
     ui::text(dc,{px(24),px(20-scroll_),rect.right-px(24),px(56-scroll_)},L"Screen Dimmer",colors_.fg);
     SelectObject(dc,smallFont_);
-    ui::text(dc,{px(24),px(60-scroll_),rect.right-px(24),px(82-scroll_)},L"A softer workspace, on your terms.",colors_.muted);
-    ui::roundFill(dc,{px(24),px(143-scroll_),rect.right-px(24),px(144-scroll_)},0,colors_.border);
+    ui::text(dc,{px(24),px(60-scroll_),rect.right-px(24),px(82-scroll_)},L"Your screens. Your quick controls. Everything stays local.",colors_.muted);
     SelectObject(dc,previous);
 }
 LRESULT CALLBACK PreferencesWindow::procedure(HWND window,UINT message,WPARAM wParam,LPARAM lParam) {
@@ -436,7 +466,8 @@ LRESULT CALLBACK PreferencesWindow::procedure(HWND window,UINT message,WPARAM wP
     if(!self) return DefWindowProcW(window,message,wParam,lParam);
     switch(message) {
     case WM_CREATE: self->dpi_=GetDpiForWindow(window); self->createControls(); return 0;
-    case WM_SIZE: self->layout(); return 0;
+    case WM_SIZE: self->layout();PostMessageW(self->owner_,ui::visibilityChanged,0,0);return 0;
+    case ui::motionAllowed: return self->settings_.smooth && !self->colors_.highContrast;
     case WM_GETMINMAXINFO: {
         auto* limits=reinterpret_cast<MINMAXINFO*>(lParam); limits->ptMinTrackSize={self->px(440),self->px(320)}; return 0;
     }
@@ -482,6 +513,7 @@ LRESULT CALLBACK PreferencesWindow::procedure(HWND window,UINT message,WPARAM wP
             const auto elapsed=std::chrono::duration<double>(std::chrono::steady_clock::now()-self->pageStart_).count();
             self->animationAlpha_=self->settings_.smooth?static_cast<int>(255*ease(elapsed*transitionSeconds/0.16)):255;
             InvalidateRect(GetDlgItem(window,navBase+self->page_),nullptr,FALSE);
+            self->layout();
             if(self->animationAlpha_==255) KillTimer(window,1);
         } else if(wParam==2) self->clearIdentifiers();
         else if(wParam==3) {
@@ -499,6 +531,7 @@ LRESULT CALLBACK PreferencesWindow::procedure(HWND window,UINT message,WPARAM wP
         for(auto font:{self->font_,self->titleFont_,self->smallFont_}) if(font) DeleteObject(font);
         self->font_=self->titleFont_=self->smallFont_=nullptr;
         if(self->background_) DeleteObject(self->background_); self->background_=nullptr;
+        if(self->canvas_) DeleteObject(self->canvas_);self->canvas_=nullptr;
         self->items_.clear(); self->items_.shrink_to_fit(); self->window_=nullptr; self->appliedTheme_=-1; return 0;
     }
     return DefWindowProcW(window,message,wParam,lParam);
